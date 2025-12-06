@@ -1,7 +1,6 @@
 'use strict';
 
-const { replyInfo, replyError } = require('../../utils/reply');
-const { EmbedBuilder } = require('discord.js');
+const { replyInfo, replyError, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
 const { weapons, gear, monsters } = require('../../utils/storage');
 
 module.exports = {
@@ -23,11 +22,11 @@ module.exports = {
 **Usage:** \`.catalog <type>\`
 
 Available catalog types:
-• \`.catalog weapon\` - View available weapons
-• \`.catalog gear\` - View available armor/gear
-• \`.catalog monster\` - View huntable monsters
+• \`.catalog weapon\` — View available weapons
+• \`.catalog gear\` — View available armor/gear
+• \`.catalog monster\` — View huntable monsters
 
-*Note: Tier 11 Mystical items are hidden.*
+Note: Tier 11 Mystical items are hidden for compact display.
         `.trim();
         return replyInfo(message, description, '📚 Catalog Help');
       }
@@ -53,7 +52,6 @@ async function sendWeaponCatalogPaginated(message, context) {
   const tiers = Object.keys(byTier).map(Number).sort((a, b) => a - b);
   const pages = [];
 
-  // Create pages with 2 tiers per page
   for (let i = 0; i < tiers.length; i += 2) {
     const pageTiers = tiers.slice(i, i + 2);
     let description = `⚔️ **Weapons** — ${filtered.length} items\n\n`;
@@ -70,8 +68,7 @@ async function sendWeaponCatalogPaginated(message, context) {
   if (pages.length === 0) return replyError(message, 'No weapons found', 'Catalog Error');
   if (pages.length === 1) return replyInfo(message, pages[0], `⚔️ Weapon Catalog (${filtered.length})`);
 
-  // Send first page with buttons
-  return sendPaginatedEmbed(message, `⚔️ Weapon Catalog (${filtered.length})`, pages, 0, context);
+  return sendPaginatedEmbed(message, `⚔️ Weapon Catalog (${filtered.length})`, pages, 0);
 }
 
 async function sendGearCatalogPaginated(message, context) {
@@ -85,7 +82,6 @@ async function sendGearCatalogPaginated(message, context) {
   const tiers = Object.keys(byTier).map(Number).sort((a, b) => a - b);
   const pages = [];
 
-  // Create pages with 2 tiers per page
   for (let i = 0; i < tiers.length; i += 2) {
     const pageTiers = tiers.slice(i, i + 2);
     let description = `🛡️ **Gear** — ${filtered.length} items\n\n`;
@@ -102,8 +98,7 @@ async function sendGearCatalogPaginated(message, context) {
   if (pages.length === 0) return replyError(message, 'No gear found', 'Catalog Error');
   if (pages.length === 1) return replyInfo(message, pages[0], `🛡️ Gear Catalog (${filtered.length})`);
 
-  // Send first page with buttons
-  return sendPaginatedEmbed(message, `🛡️ Gear Catalog (${filtered.length})`, pages, 0, context);
+  return sendPaginatedEmbed(message, `🛡️ Gear Catalog (${filtered.length})`, pages, 0);
 }
 
 async function sendMonsterCatalog(message) {
@@ -117,22 +112,22 @@ async function sendMonsterCatalog(message) {
       description += `**🔰 Tier ${m.tier}**\n`;
       currentTier = m.tier;
     }
-    // Show name once with emoji for duplicate, threshold and reward
     description += `• **${m.name}** 👹 — ⚡ Threshold: **${m.threshold}** • 💎 Reward: **${m.gems}**\n`;
   });
 
   return replyInfo(message, description.trim(), `👹 Monster Catalog (${sorted.length})`);
 }
 
-async function sendPaginatedEmbed(message, title, pages, currentPage, context) {
+async function sendPaginatedEmbed(message, title, pages, currentPage) {
   const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 
-  const embed = new EmbedBuilder()
-    .setColor(0x3498db)
-    .setTitle(`${title} (Page ${currentPage + 1}/${pages.length})`)
-    .setDescription(pages[currentPage])
-    .setFooter({ text: '⚔️ Powered by Funtan Bot' })
-    .setTimestamp();
+  const embed = buildEmbed({
+    title: `${title} (Page ${currentPage + 1}/${pages.length})`,
+    description: pages[currentPage],
+    color: DEFAULT_THEME.COLORS.INFO,
+    footer: DEFAULT_THEME.FOOTER,
+    theme: DEFAULT_THEME
+  });
 
   const row = new ActionRowBuilder();
 

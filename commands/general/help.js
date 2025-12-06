@@ -1,7 +1,6 @@
-// commands/general/help.js
 'use strict';
 
-const { replyInfo, replyError } = require('../../utils/reply');
+const { replyFromResult, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
 
 module.exports = {
   name: 'help',
@@ -29,7 +28,7 @@ module.exports = {
       lines.push('**🕹️ Game Commands**');
       lines.push('');
       lines.push(`\`${p}daily\` — Claim your daily bronze reward (24h cooldown).`);
-      lines.push(`\`${p}work\` — Start a ${Math.floor(9)}-hour work session (9h).`);
+      lines.push(`\`${p}work\` — Start a 9-hour work session.`);
       lines.push(`\`${p}collect\` — Collect finished work rewards (includes streak bonus).`);
       lines.push(`\`${p}hunt [monsterId]\` — Hunt a monster. Omit monsterId to auto-select a suitable target.`);
       lines.push(`\`${p}inventory [weapon|gear]\` — Show your inventory (omit to show both).`);
@@ -75,16 +74,18 @@ module.exports = {
       if (requested) {
         const detail = getCommandDetail(requested, p, DEV_MODE);
         if (detail) {
-          return sendChunkedEmbed(message, `❓ Help: ${requested}`, detail);
+          return sendChunkedEmbeds(message, `❓ Help: ${requested}`, detail);
         }
       }
 
       const text = lines.join('\n');
-      // Send as multiple embed pages when needed
-      return sendChunkedEmbed(message, '📜 Help', text);
+      return sendChunkedEmbeds(message, '📜 Help', text);
     } catch (err) {
       console.error('help command error:', err);
-      return replyError(message, 'Failed to show help. Please try again later.', 'Help Error');
+      return replyFromResult(message, { success: false, error: 'Failed to show help. Please try again later.', reason: 'Error' }, {
+        label: 'Help',
+        errorTitle: 'Help Error'
+      });
     }
   }
 };
@@ -107,7 +108,6 @@ function getCommandDetail(cmd, prefix, devMode) {
     help: `\`${p}help [command]\` — Show general help or details for a specific command.`
   };
 
-  // admin-only details if devMode
   if (devMode) {
     map.grant = `\`${p}grant @user <catalogId> <weapon|gear> [qty]\` — Grant a catalog item to a player (DEV_MODE/admin).`;
     map.adjust = `\`${p}adjust @user <bronze|silver|gold|gems> <amount>\` — Adjust player currency (DEV_MODE/admin).`;
@@ -154,11 +154,22 @@ function chunkByLines(text, size = CHUNK_SIZE) {
   return parts;
 }
 
-async function sendChunkedEmbed(message, title, fullText) {
+async function sendChunkedEmbeds(message, title, fullText) {
   const parts = chunkByLines(fullText);
   if (!parts || parts.length === 0) return;
   for (let i = 0; i < parts.length; i++) {
     const suffix = parts.length > 1 ? ` (Page ${i + 1}/${parts.length})` : '';
-    await replyInfo(message, parts[i], `${title}${suffix}`);
+    const embed = buildEmbed({
+      title: `${title}${suffix}`,
+      description: parts[i],
+      color: DEFAULT_THEME.COLORS.INFO,
+      footer: DEFAULT_THEME.FOOTER,
+      theme: DEFAULT_THEME
+    });
+    if (i === 0) {
+      await message.reply({ embeds: [embed] });
+    } else {
+      await message.channel.send({ embeds: [embed] });
+    }
   }
 }

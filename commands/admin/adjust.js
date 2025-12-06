@@ -1,5 +1,6 @@
-// commands/admin/adjust.js
 'use strict';
+
+const { replyFromResult } = require('../../utils/reply');
 
 module.exports = {
   name: 'adjust',
@@ -26,7 +27,10 @@ module.exports = {
       }
 
       if (!isAdmin(callerId)) {
-        return message.reply('❌ You are not authorized to use this command.');
+        return replyFromResult(message, { success: false, error: 'You are not authorized to use this command.', reason: 'Forbidden' }, {
+          label: 'Adjust',
+          errorTitle: 'Unauthorized'
+        });
       }
 
       const targetMention = args[0];
@@ -34,41 +38,62 @@ module.exports = {
       const amount = args[2] ? parseInt(args[2], 10) : NaN;
 
       if (!targetMention || !currency || Number.isNaN(amount)) {
-        return message.reply('Usage: `.adjust @user <bronze|silver|gold|gems> <amount>`');
+        return replyFromResult(message, { success: false, error: 'Usage: `.adjust @user <bronze|silver|gold|gems> <amount>`', reason: 'InvalidInput' }, {
+          label: 'Adjust',
+          errorTitle: 'Invalid Usage'
+        });
       }
 
       const match = targetMention.match(/^<@!?(\d+)>$/);
-      if (!match) return message.reply('Please mention the target user (e.g. @User).');
+      if (!match) {
+        return replyFromResult(message, { success: false, error: 'Please mention the target user (e.g. @User).', reason: 'InvalidInput' }, {
+          label: 'Adjust',
+          errorTitle: 'Invalid Target'
+        });
+      }
       const targetId = match[1];
 
       if (!storage || typeof storage.adminAdjustCurrency !== 'function') {
         console.error('storage.adminAdjustCurrency is not available in command context');
-        return message.reply('❌ Bot storage is not available. Try again later.');
+        return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
+          label: 'Adjust',
+          errorTitle: 'Error'
+        });
+      }
+
+      // Validate currency keys if config provides CURRENCIES
+      if (config && config.CURRENCIES) {
+        const allowed = Object.keys(config.CURRENCIES).map(k => k.toLowerCase());
+        if (!allowed.includes(currency)) {
+          return replyFromResult(message, { success: false, error: `Invalid currency type. Allowed: ${allowed.join(', ')}`, reason: 'InvalidCurrencyType' }, {
+            label: 'Adjust',
+            errorTitle: 'Invalid Currency'
+          });
+        }
       }
 
       const res = await storage.adminAdjustCurrency(targetId, { [currency]: amount });
 
-      if (!res || res.success === false) {
-        console.error('adminAdjustCurrency failed:', res && res.error ? res.error : res);
-        return message.reply(`❌ Adjust failed: ${res && res.error ? res.error : 'unknown error'}`);
-      }
-
-      const balance = res.balance || {};
-      const bronze = balance.bronze ?? 'N/A';
-      const silver = balance.silver ?? 'N/A';
-      const gold = balance.gold ?? 'N/A';
-      const gems = balance.gems ?? 'N/A';
-
-      return message.reply(
-        `✅ Adjusted **${currency}** by **${amount}** for <@${targetId}>.\nNew balances — Bronze: **${bronze}**, Silver: **${silver}**, Gold: **${gold}**, Gems: **${gems}**.`
-      );
+      // Use replyFromResult to handle errors; on success provide a custom successDescription
+      return replyFromResult(message, res, {
+        label: 'Adjust',
+        successTitle: 'Adjusted',
+        successDescription: (d) => {
+          const balance = d.balance || {};
+          const bronze = balance.bronze ?? 'N/A';
+          const silver = balance.silver ?? 'N/A';
+          const gold = balance.gold ?? 'N/A';
+          const gems = balance.gems ?? 'N/A';
+          return `✅ Adjusted **${currency}** by **${amount}** for <@${targetId}>.\nNew balances — Bronze: **${bronze}**, Silver: **${silver}**, Gold: **${gold}**, Gems: **${gems}**.`;
+        },
+        errorTitle: 'Failed'
+      });
     } catch (err) {
       console.error('Adjust command error:', err);
-      try {
-        await message.reply(`❌ Adjust failed: ${err && err.message ? err.message : 'unexpected error'}`);
-      } catch (replyErr) {
-        console.error('Failed to send error reply:', replyErr);
-      }
+      return replyFromResult(message, { success: false, error: err?.message || 'unexpected error', reason: 'Error' }, {
+        label: 'Adjust',
+        errorTitle: 'Error'
+      });
     }
   }
 };

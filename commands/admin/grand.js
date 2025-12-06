@@ -1,5 +1,6 @@
-// commands/admin/grant.js
 'use strict';
+
+const { replyFromResult } = require('../../utils/reply');
 
 module.exports = {
   name: 'grant',
@@ -25,7 +26,10 @@ module.exports = {
       }
 
       if (!isAdmin(callerId)) {
-        return message.reply('❌ You are not authorized to use this command.');
+        return replyFromResult(message, { success: false, error: 'You are not authorized to use this command.', reason: 'Forbidden' }, {
+          label: 'Grant',
+          errorTitle: 'Unauthorized'
+        });
       }
 
       const targetMention = args[0];
@@ -34,50 +38,68 @@ module.exports = {
       const qty = args[3] ? parseInt(args[3], 10) : 1;
 
       if (!targetMention || !catalogId || !type) {
-        return message.reply('Usage: `.grant @user <catalogId> <weapon|gear> [qty]`');
+        return replyFromResult(message, { success: false, error: 'Usage: `.grant @user <catalogId> <weapon|gear> [qty]`', reason: 'InvalidInput' }, {
+          label: 'Grant',
+          errorTitle: 'Invalid Usage'
+        });
       }
 
       if (!['weapon', 'gear'].includes(type)) {
-        return message.reply('Item type must be "weapon" or "gear".');
+        return replyFromResult(message, { success: false, error: 'Item type must be "weapon" or "gear".', reason: 'InvalidInput' }, {
+          label: 'Grant',
+          errorTitle: 'Invalid Type'
+        });
       }
 
       if (Number.isNaN(qty) || qty <= 0) {
-        return message.reply('Quantity must be a positive integer.');
+        return replyFromResult(message, { success: false, error: 'Quantity must be a positive integer.', reason: 'InvalidInput' }, {
+          label: 'Grant',
+          errorTitle: 'Invalid Quantity'
+        });
       }
 
       const match = targetMention.match(/^<@!?(\d+)>$/);
-      if (!match) return message.reply('Please mention the target user (e.g. @User).');
+      if (!match) {
+        return replyFromResult(message, { success: false, error: 'Please mention the target user (e.g. @User).', reason: 'InvalidInput' }, {
+          label: 'Grant',
+          errorTitle: 'Invalid Target'
+        });
+      }
       const targetId = match[1];
 
       if (!storage || typeof storage.adminGrantItem !== 'function') {
         console.error('storage.adminGrantItem is not available in command context');
-        return message.reply('❌ Bot storage is not available. Try again later.');
+        return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
+          label: 'Grant',
+          errorTitle: 'Error'
+        });
       }
 
       const res = await storage.adminGrantItem(targetId, catalogId, type, qty);
 
-      if (!res || res.success === false) {
-        console.error('adminGrantItem failed:', res && res.error ? res.error : res);
-        return message.reply(`❌ Grant failed: ${res && res.error ? res.error : 'unknown error'}`);
-      }
-
-      // If inventory info returned, show item name/count; otherwise show generic success
-      const inv = res.inventory || res.rec || null;
-      if (inv) {
-        const name = inv.itemName || inv.item_name || catalogId;
-        const id = inv.id ?? inv.inventoryId ?? 'N/A';
-        const count = inv.count ?? qty;
-        return message.reply(`✅ Granted ${count}x **${name}** (${type}) to <@${targetId}>. Inventory ID: ${id}.`);
-      }
-
-      return message.reply(`✅ Granted ${qty}x ${catalogId} (${type}) to <@${targetId}>.`);
+      return replyFromResult(message, res, {
+        label: 'Grant',
+        successTitle: 'Granted',
+        successDescription: (d) => {
+          // storage may return inventory, rec, or data.inventory
+          const inv = d.inventory || d.rec || d.data?.inventory || null;
+          if (inv) {
+            const name = inv.itemName || inv.item_name || catalogId;
+            const id = inv.id ?? inv.inventoryId ?? 'N/A';
+            const count = inv.count ?? qty;
+            return `✅ Granted ${count}x **${name}** (${type}) to <@${targetId}>. Inventory ID: ${id}.`;
+          }
+          // fallback generic message
+          return `✅ Granted ${qty}x **${catalogId}** (${type}) to <@${targetId}>.`;
+        },
+        errorTitle: 'Failed'
+      });
     } catch (err) {
       console.error('Grant command error:', err);
-      try {
-        await message.reply(`❌ Grant failed: ${err && err.message ? err.message : 'unexpected error'}`);
-      } catch (replyErr) {
-        console.error('Failed to send error reply:', replyErr);
-      }
+      return replyFromResult(message, { success: false, error: err?.message || 'unexpected error', reason: 'Error' }, {
+        label: 'Grant',
+        errorTitle: 'Error'
+      });
     }
   }
 };

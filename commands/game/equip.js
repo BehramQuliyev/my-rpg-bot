@@ -1,7 +1,6 @@
-// commands/game/equip.js
 'use strict';
 
-const { replySuccess, replyError } = require('../../utils/reply');
+const { replyFromResult } = require('../../utils/reply');
 
 module.exports = {
   name: 'equip',
@@ -9,8 +8,10 @@ module.exports = {
   async execute(message, args = [], context = {}) {
     const { storage } = context;
     if (!storage || (typeof storage.equipWeaponByInventoryId !== 'function' && typeof storage.equipGearByInventoryId !== 'function')) {
-      console.error('storage equip helpers are not available in command context');
-      return await replyError(message, 'Bot storage is not available. Try again later.', 'Error');
+      return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
+        label: 'Equip',
+        errorTitle: 'Error'
+      });
     }
 
     try {
@@ -19,36 +20,52 @@ module.exports = {
       const slot = args[1] ? String(args[1]).toLowerCase() : null;
 
       if (!inventoryId || Number.isNaN(inventoryId) || !slot) {
-        return await replyError(message, 'Usage: `.equip <inventoryId> <weapon|gear>`', 'Invalid Usage');
+        return replyFromResult(message, { success: false, error: 'Usage: `.equip <inventoryId> <weapon|gear>`', reason: 'InvalidInput' }, {
+          label: 'Equip',
+          errorTitle: 'Invalid Usage'
+        });
       }
+
       if (!['weapon', 'gear'].includes(slot)) {
-        return await replyError(message, 'Slot must be "weapon" or "gear".', 'Invalid Slot');
+        return replyFromResult(message, { success: false, error: 'Slot must be "weapon" or "gear".', reason: 'InvalidInput' }, {
+          label: 'Equip',
+          errorTitle: 'Invalid Slot'
+        });
       }
 
       if (slot === 'weapon') {
         const res = await storage.equipWeaponByInventoryId(userId, inventoryId);
-        if (!res || res.success === false) {
-          console.error('equipWeaponByInventoryId failed:', res && res.error ? res.error : res);
-          return await replyError(message, `Failed to equip weapon: ${res && res.error ? res.error : 'unknown error'}`, 'Failed');
-        }
-        const inv = res.inventory;
-        const name = inv && inv.itemName ? inv.itemName : `ID ${inventoryId}`;
-        const id = inv && inv.id ? inv.id : inventoryId;
-        return await replySuccess(message, `Equipped weapon: **${name}** (ID ${id}).`, 'Equipped');
+        return replyFromResult(message, res, {
+          label: 'Equip weapon',
+          successTitle: 'Equipped',
+          successDescription: (d) => {
+            const inv = d.inventory || {};
+            const name = inv.itemName || `ID ${inventoryId}`;
+            const id = inv.id ?? inventoryId;
+            return `Equipped weapon: **${name}** (ID ${id}).`;
+          },
+          errorTitle: 'Failed'
+        });
       } else {
         const res = await storage.equipGearByInventoryId(userId, inventoryId);
-        if (!res || res.success === false) {
-          console.error('equipGearByInventoryId failed:', res && res.error ? res.error : res);
-          return await replyError(message, `Failed to equip gear: ${res && res.error ? res.error : 'unknown error'}`, 'Failed');
-        }
-        const inv = res.inventory;
-        const name = inv && inv.itemName ? inv.itemName : `ID ${inventoryId}`;
-        const id = inv && inv.id ? inv.id : inventoryId;
-        return await replySuccess(message, `Equipped gear: **${name}** (ID ${id}).`, 'Equipped');
+        return replyFromResult(message, res, {
+          label: 'Equip gear',
+          successTitle: 'Equipped',
+          successDescription: (d) => {
+            const inv = d.inventory || {};
+            const name = inv.itemName || `ID ${inventoryId}`;
+            const id = inv.id ?? inventoryId;
+            return `Equipped gear: **${name}** (ID ${id}).`;
+          },
+          errorTitle: 'Failed'
+        });
       }
     } catch (err) {
       console.error('equip command error:', err);
-      return await replyError(message, `Failed to equip: ${err && err.message ? err.message : 'unexpected error'}`, 'Error');
+      return replyFromResult(message, { success: false, error: err?.message || 'unexpected error', reason: 'Error' }, {
+        label: 'Equip',
+        errorTitle: 'Error'
+      });
     }
   }
 };

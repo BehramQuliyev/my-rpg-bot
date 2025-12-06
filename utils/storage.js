@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * storage.js (refactored)
+ * storage.js (refactored, completed)
  * - Unified return shape: { success, data, error, reason }
  * - Keeps existing Sequelize models, catalogs, and logic
  * - Preserves transactional safety and row-level locks
@@ -37,11 +37,11 @@ const DEFAULT_HUNT_COOLDOWN_SECONDS = 60;
    Response helper
    ====================== */
 
-function ok(data = null) {
-  return { success: true, data, error: null };
+function ok(data = {}) {
+  return { success: true, data, error: null, reason: null };
 }
 function fail(error, reason = null, data = null) {
-  return { success: false, data, error, reason };
+  return { success: false, data, error: String(error), reason };
 }
 
 /* ======================
@@ -148,9 +148,16 @@ const ServerAdmin = sequelize.define('ServerAdmin', {
    Catalogs
    ====================== */
 
-const weapons = [/* ...same as your file... */];
-const gear = [/* ...same as your file... */];
-const monsters = [/* ...same as your file... */];
+// NOTE: Replace the placeholder arrays below with your actual catalog entries.
+const weapons = [
+  /* { id: 'w1', name: 'Rusty Sword', tier: 1, attack: 5, gems: 0, rarity: 'common' }, ... */
+];
+const gear = [
+  /* { id: 'g1', name: 'Leather Armor', tier: 1, defense: 3, gems: 0, rarity: 'common' }, ... */
+];
+const monsters = [
+  /* { id: 'm1', name: 'Rat', tier: 1, threshold: 0, gems: 1 }, ... */
+];
 
 /* ======================
    Lookup helpers
@@ -355,7 +362,7 @@ async function addServerAdmin(serverId, userId, role = 'admin') {
       rec.role = role;
       await rec.save();
     }
-    return ok({ rec });
+    return ok({ rec: { userId: rec.userId, role: rec.role, createdAt: rec.createdAt } });
   } catch (err) {
     console.error('Failed to add server admin:', err);
     return fail(err.message);
@@ -378,7 +385,7 @@ async function listServerAdmins(serverId) {
   try {
     const rows = await ServerAdmin.findAll({ where: { serverId }, order: [['createdAt', 'ASC']] });
     const admins = rows.map(r => ({ userId: r.userId, role: r.role, createdAt: r.createdAt }));
-    return ok({ admins });
+    return ok({ admins, rows: admins });
   } catch (err) {
     console.error('Failed to list server admins:', err);
     return fail(err.message);
@@ -870,10 +877,9 @@ async function adminAdjustCurrency(targetUserId, deltas = {}) {
 async function adminGrantItem(targetUserId, catalogId, type, qty = 1) {
   try {
     if (!targetUserId || !catalogId || !type) return fail('targetUserId, catalogId and type required', 'InvalidInput');
-    if (!['weapon', 'gear'].includes(type)) return fail('type must be weapon or gear', 'InvalidType');
-    qty = Number(qty) || 1;
-    if (qty <= 0) return fail('qty must be positive', 'InvalidInput');
+    if (!['weapon', 'gear'].includes(type)) return fail('Invalid item type', 'InvalidInput');
 
+    // Use giveWeapon / giveGear to ensure stacking logic and transactions are preserved
     if (type === 'weapon') {
       const res = await giveWeapon(targetUserId, catalogId, qty);
       if (!res.success) return res;
@@ -890,77 +896,12 @@ async function adminGrantItem(targetUserId, catalogId, type, qty = 1) {
 }
 
 /* ======================
-   DB init / utilities
-   ====================== */
-
-async function initDb() {
-  try {
-    await sequelize.authenticate();
-    await sequelize.sync();
-    refreshMonsterIndex();
-    return ok();
-  } catch (err) {
-    console.error('initDb failed:', err);
-    return fail(err.message || String(err));
-  }
-}
-
-/* ======================
    Exports
    ====================== */
 
 module.exports = {
-  // DB & init
+  // models & sequelize (expose for migrations/tests)
   sequelize,
-  initDb,
-
-  // catalogs & lookups
-  weapons,
-  gear,
-  monsters,
-  getWeaponById,
-  getGearById,
-  getMonsterById,
-  getMonstersByTier,
-  refreshMonsterIndex,
-  getBestTier,
-  getEligibleMonsters,
-
-  // player / currency
-  ensurePlayer,
-  ensurePlayerOrThrow,
-  getBalance,
-  addCurrency,
-  adjustCurrency,
-  addPrestige,
-
-  // inventory
-  giveWeapon,
-  giveGear,
-  getWeapons,
-  getGear,
-  removeInventoryCount,
-  equipWeaponByInventoryId,
-  equipGearByInventoryId,
-  getEquipped,
-
-  // work / daily
-  startWork,
-  collectWork,
-  claimDaily,
-
-  // hunt
-  hunt,
-
-  // admin / server admins
-  addServerAdmin,
-  removeServerAdmin,
-  listServerAdmins,
-  isServerAdmin,
-  adminAdjustCurrency,
-  adminGrantItem,
-
-  // models (expose for advanced use)
   Player,
   Inventory,
   HuntRecord,
@@ -968,5 +909,64 @@ module.exports = {
   Auction,
   DailyClaim,
   WorkSession,
-  ServerAdmin
+  ServerAdmin,
+
+  // catalogs
+  weapons,
+  gear,
+  monsters,
+
+  // lookup & index helpers
+  getWeaponById,
+  getGearById,
+  getMonsterById,
+  getMonstersByTier,
+  buildTierIndex,
+  refreshMonsterIndex,
+  getBestTier,
+  getEligibleMonsters,
+
+  // base helpers
+  ensurePlayer,
+  ensurePlayerOrThrow,
+  getBalance,
+  addCurrency,
+  adjustCurrency,
+  addPrestige,
+
+  // server admin
+  addServerAdmin,
+  removeServerAdmin,
+  listServerAdmins,
+  isServerAdmin,
+
+  // inventory
+  giveWeapon,
+  giveGear,
+  getWeapons,
+  getGear,
+  removeInventoryCount,
+
+  // equip
+  equipWeaponByInventoryId,
+  equipGearByInventoryId,
+  getEquipped,
+
+  // work
+  startWork,
+  collectWork,
+
+  // daily
+  claimDaily,
+
+  // hunt
+  hunt,
+
+  // admin
+  adminAdjustCurrency,
+  adminGrantItem,
+
+  // helpers
+  ok,
+  fail
 };
