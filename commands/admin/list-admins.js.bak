@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { replyFromResult, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
 
@@ -22,9 +22,9 @@ module.exports = {
       }
 
       // Resolve global admin IDs from validated config first, fallback to env
-      const GLOBAL_ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length ?
-      config.ADMIN_IDS :
-      (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const GLOBAL_ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length
+        ? config.ADMIN_IDS
+        : (process.env.ADMIN_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
 
       const serverId = message.guild.id;
       const callerId = message.author.id;
@@ -51,9 +51,9 @@ module.exports = {
 
       const callerIsServerAdminRes = await storage.isServerAdmin(serverId, callerId);
       const callerIsServerAdmin = !!(
-      callerIsServerAdminRes && callerIsServerAdminRes.isAdmin ||
-      callerIsServerAdminRes && callerIsServerAdminRes.success && (callerIsServerAdminRes.data?.isAdmin || callerIsServerAdminRes.data?.is_admin));
-
+        (callerIsServerAdminRes && callerIsServerAdminRes.isAdmin) ||
+        (callerIsServerAdminRes && callerIsServerAdminRes.success && (callerIsServerAdminRes.data?.isAdmin || callerIsServerAdminRes.data?.is_admin))
+      );
 
       const canManage = callerIsOwner || callerIsGlobalAdmin || callerIsServerAdmin;
 
@@ -63,7 +63,7 @@ module.exports = {
       if (action === 'list') {
         const rowsRaw = await storage.listServerAdmins(serverId);
         // support both legacy array and result shape
-        const rows = Array.isArray(rowsRaw) ? rowsRaw : rowsRaw && rowsRaw.success ? rowsRaw.data?.rows || rowsRaw.data || [] : rowsRaw || [];
+        const rows = Array.isArray(rowsRaw) ? rowsRaw : (rowsRaw && rowsRaw.success ? (rowsRaw.data?.rows || rowsRaw.data || []) : (rowsRaw || []));
 
         if (!rows || rows.length === 0) {
           return replyFromResult(message, { success: true, data: { rows: [] } }, {
@@ -85,8 +85,8 @@ module.exports = {
             theme: DEFAULT_THEME
           });
 
-          const lines = chunk.map((r) => {
-            const added = r.createdAt ? new Date(r.createdAt).toLocaleString() : r.addedAt ? new Date(r.addedAt).toLocaleString() : 'unknown';
+          const lines = chunk.map(r => {
+            const added = r.createdAt ? new Date(r.createdAt).toLocaleString() : (r.addedAt ? new Date(r.addedAt).toLocaleString() : 'unknown');
             const role = r.role || r.roleName || 'admin';
             const userId = r.userId || r.user_id || r.id || 'unknown';
             return `• <@${userId}> — ${role} • added ${added}`;

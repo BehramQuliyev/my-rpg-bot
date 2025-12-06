@@ -1,6 +1,6 @@
 'use strict';
 
-const { replyInfo, replyError, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
+const { replyFromResult, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
 const { weapons, gear, monsters } = require('../../utils/storage');
 
 module.exports = {
@@ -28,7 +28,12 @@ Available catalog types:
 
 Note: Tier 11 Mystical items are hidden for compact display.
         `.trim();
-        return replyInfo(message, description, '📚 Catalog Help');
+
+        return replyFromResult(message, { success: true, data: {} }, {
+          label: 'Catalog Help',
+          successTitle: '📚 Catalog Help',
+          successDescription: () => description
+        });
       }
 
       if (type === 'weapon') return await sendWeaponCatalogPaginated(message, context);
@@ -36,13 +41,16 @@ Note: Tier 11 Mystical items are hidden for compact display.
       if (type === 'monster') return await sendMonsterCatalog(message);
     } catch (err) {
       console.error('Catalog command error:', err);
-      return replyError(message, err.message || 'An error occurred', 'Catalog Error');
+      return replyFromResult(message, { success: false, error: err?.message || 'An error occurred' }, {
+        label: 'Catalog',
+        errorTitle: 'Catalog Error'
+      });
     }
   }
 };
 
 async function sendWeaponCatalogPaginated(message, context) {
-  const filtered = weapons.filter(w => w.tier !== 11);
+  const filtered = (Array.isArray(weapons) ? weapons : []).filter(w => w.tier !== 11);
   const byTier = {};
   filtered.forEach(w => {
     byTier[w.tier] = byTier[w.tier] || [];
@@ -65,14 +73,26 @@ async function sendWeaponCatalogPaginated(message, context) {
     pages.push(description.trim());
   }
 
-  if (pages.length === 0) return replyError(message, 'No weapons found', 'Catalog Error');
-  if (pages.length === 1) return replyInfo(message, pages[0], `⚔️ Weapon Catalog (${filtered.length})`);
+  if (pages.length === 0) {
+    return replyFromResult(message, { success: false, error: 'No weapons found' }, {
+      label: 'Weapon Catalog',
+      errorTitle: 'Catalog Error'
+    });
+  }
+
+  if (pages.length === 1) {
+    return replyFromResult(message, { success: true, data: {} }, {
+      label: 'Weapon Catalog',
+      successTitle: `⚔️ Weapon Catalog (${filtered.length})`,
+      successDescription: () => pages[0]
+    });
+  }
 
   return sendPaginatedEmbed(message, `⚔️ Weapon Catalog (${filtered.length})`, pages, 0);
 }
 
 async function sendGearCatalogPaginated(message, context) {
-  const filtered = gear.filter(g => g.tier !== 11);
+  const filtered = (Array.isArray(gear) ? gear : []).filter(g => g.tier !== 11);
   const byTier = {};
   filtered.forEach(g => {
     byTier[g.tier] = byTier[g.tier] || [];
@@ -95,14 +115,26 @@ async function sendGearCatalogPaginated(message, context) {
     pages.push(description.trim());
   }
 
-  if (pages.length === 0) return replyError(message, 'No gear found', 'Catalog Error');
-  if (pages.length === 1) return replyInfo(message, pages[0], `🛡️ Gear Catalog (${filtered.length})`);
+  if (pages.length === 0) {
+    return replyFromResult(message, { success: false, error: 'No gear found' }, {
+      label: 'Gear Catalog',
+      errorTitle: 'Catalog Error'
+    });
+  }
+
+  if (pages.length === 1) {
+    return replyFromResult(message, { success: true, data: {} }, {
+      label: 'Gear Catalog',
+      successTitle: `🛡️ Gear Catalog (${filtered.length})`,
+      successDescription: () => pages[0]
+    });
+  }
 
   return sendPaginatedEmbed(message, `🛡️ Gear Catalog (${filtered.length})`, pages, 0);
 }
 
 async function sendMonsterCatalog(message) {
-  const filtered = monsters.filter(m => m.tier !== 11);
+  const filtered = (Array.isArray(monsters) ? monsters : []).filter(m => m.tier !== 11);
   const sorted = [...filtered].sort((a, b) => a.tier - b.tier || a.threshold - b.threshold);
 
   let description = `👹 **Monsters** — ${sorted.length} creatures\n\n`;
@@ -115,7 +147,11 @@ async function sendMonsterCatalog(message) {
     description += `• **${m.name}** 👹 — ⚡ Threshold: **${m.threshold}** • 💎 Reward: **${m.gems}**\n`;
   });
 
-  return replyInfo(message, description.trim(), `👹 Monster Catalog (${sorted.length})`);
+  return replyFromResult(message, { success: true, data: {} }, {
+    label: 'Monster Catalog',
+    successTitle: `👹 Monster Catalog (${sorted.length})`,
+    successDescription: () => description.trim()
+  });
 }
 
 async function sendPaginatedEmbed(message, title, pages, currentPage) {

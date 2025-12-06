@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { replyFromResult, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
 
@@ -14,13 +14,13 @@ module.exports = {
     try {
       const cfg = context.config || {};
       const PREFIX = cfg.PREFIX || process.env.PREFIX || '.';
-      const DEV_MODE = typeof cfg.DEV_MODE === 'boolean' ? cfg.DEV_MODE : process.env.DEV_MODE === 'true';
+      const DEV_MODE = typeof cfg.DEV_MODE === 'boolean' ? cfg.DEV_MODE : (process.env.DEV_MODE === 'true');
 
       const p = PREFIX;
 
-      const adminIdsDisplay = Array.isArray(cfg.ADMIN_IDS) && cfg.ADMIN_IDS.length ?
-      cfg.ADMIN_IDS.join(', ') :
-      (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean).join(', ') || 'None configured';
+      const adminIdsDisplay = Array.isArray(cfg.ADMIN_IDS) && cfg.ADMIN_IDS.length
+        ? cfg.ADMIN_IDS.join(', ')
+        : (process.env.ADMIN_IDS || '').split(',').map(s => s.trim()).filter(Boolean).join(', ') || 'None configured';
 
       // Build help sections with emojis and short descriptions
       const lines = [];
@@ -129,7 +129,7 @@ function chunkByLines(text, size = CHUNK_SIZE) {
 
   for (const rawLine of lines) {
     const line = rawLine + '\n';
-    if (current.length + line.length <= size) {
+    if ((current.length + line.length) <= size) {
       current += line;
       continue;
     }

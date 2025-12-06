@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { replyFromResult } = require('../../utils/reply');
 
@@ -20,8 +20,8 @@ module.exports = {
       label: 'Work collect',
       successTitle: 'Rewards collected',
       successDescription: (d) =>
-      `**${d.totalReward} silver** collected (base ${d.baseReward} + bonus ${d.bonus}).\n` +
-      `New silver: **${d.newSilver}**\nStreak: **${d.streak}**.`,
+        `**${d.totalReward} silver** collected (base ${d.baseReward} + bonus ${d.bonus}).\n` +
+        `New silver: **${d.newSilver}**\nStreak: **${d.streak}**.`,
       infoTitle: 'Info',
       errorTitle: 'Error'
     });

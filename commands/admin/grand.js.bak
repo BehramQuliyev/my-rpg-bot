@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { replyFromResult } = require('../../utils/reply');
 
@@ -14,9 +14,9 @@ module.exports = {
       const { storage, config } = context;
 
       // Resolve admin IDs from validated config first, fallback to env
-      const ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length ?
-      config.ADMIN_IDS :
-      (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length
+        ? config.ADMIN_IDS
+        : (process.env.ADMIN_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
 
       const callerId = message.author.id;
       function isAdmin(callerIdLocal) {

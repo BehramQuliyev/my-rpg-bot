@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { replyFromResult, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
 
@@ -53,7 +53,7 @@ module.exports = {
 
         // Get equipped to mark items
         const eqRes = await storage.getEquipped(userId);
-        const equippedId = eqRes && eqRes.success && eqRes.data ? type === 'weapon' ? eqRes.data.weapon?.id : eqRes.data.gear?.id : null;
+        const equippedId = (eqRes && eqRes.success && eqRes.data) ? (type === 'weapon' ? eqRes.data.weapon?.id : eqRes.data.gear?.id) : null;
 
         // Sort so equipped items appear first
         const sorted = [...rows].sort((a, b) => {
@@ -74,13 +74,13 @@ module.exports = {
 
       // No type specified: fetch weapons, gear, and equipped in parallel
       const [wRes, gRes, eqRes] = await Promise.all([
-      storage.getWeapons(userId),
-      storage.getGear(userId),
-      storage.getEquipped(userId)]
-      );
+        storage.getWeapons(userId),
+        storage.getGear(userId),
+        storage.getEquipped(userId)
+      ]);
 
-      if (wRes && wRes.success === false || gRes && gRes.success === false || eqRes && eqRes.success === false) {
-        const failed = wRes && wRes.success === false ? wRes : gRes && gRes.success === false ? gRes : eqRes;
+      if ((wRes && wRes.success === false) || (gRes && gRes.success === false) || (eqRes && eqRes.success === false)) {
+        const failed = wRes && wRes.success === false ? wRes : (gRes && gRes.success === false ? gRes : eqRes);
         return replyFromResult(message, failed || { success: false, error: 'Failed to fetch inventory', reason: 'Error' }, {
           label: 'Inventory',
           errorTitle: 'Error'
@@ -110,8 +110,8 @@ module.exports = {
       const gearSorted = sortWithEquippedFirst(gear, equippedGearId);
 
       // Build compact lists (first page only) and include "view all" hint via buttons
-      const weaponsList = weaponsSorted.slice(0, 20).map((r) => formatItemLine(r, equippedWeaponId)).join('\n') || '_No weapons_';
-      const gearList = gearSorted.slice(0, 20).map((r) => formatItemLine(r, equippedGearId)).join('\n') || '_No gear_';
+      const weaponsList = weaponsSorted.slice(0, 20).map(r => formatItemLine(r, equippedWeaponId)).join('\n') || '_No weapons_';
+      const gearList = gearSorted.slice(0, 20).map(r => formatItemLine(r, equippedGearId)).join('\n') || '_No gear_';
 
       const embed = buildEmbed({
         title: 'Inventory',
@@ -140,18 +140,18 @@ module.exports = {
       const row = new ActionRowBuilder();
       if (weapons.length > 20) {
         row.addComponents(
-          new ButtonBuilder().
-          setCustomId('inv_view_weapons_0').
-          setLabel('View all Weapons').
-          setStyle(ButtonStyle.Primary)
+          new ButtonBuilder()
+            .setCustomId('inv_view_weapons_0')
+            .setLabel('View all Weapons')
+            .setStyle(ButtonStyle.Primary)
         );
       }
       if (gear.length > 20) {
         row.addComponents(
-          new ButtonBuilder().
-          setCustomId('inv_view_gear_0').
-          setLabel('View all Gear').
-          setStyle(ButtonStyle.Primary)
+          new ButtonBuilder()
+            .setCustomId('inv_view_gear_0')
+            .setLabel('View all Gear')
+            .setStyle(ButtonStyle.Primary)
         );
       }
 
@@ -170,7 +170,7 @@ module.exports = {
       collector.on('collect', async (interaction) => {
         try {
           await interaction.deferUpdate();
-          const [prefix,, pageStr] = interaction.customId.split('_'); // e.g., inv_view_weapons_0
+          const [prefix, , pageStr] = interaction.customId.split('_'); // e.g., inv_view_weapons_0
           const isWeapons = interaction.customId.includes('weapons');
           const page = parseInt(pageStr, 10) || 0;
           const list = isWeapons ? weaponsSorted : gearSorted;
@@ -191,15 +191,15 @@ module.exports = {
         // disable buttons after collector ends
         try {
           const disabledRow = new ActionRowBuilder();
-          row.components.forEach((c) => {
+          row.components.forEach(c => {
             const btn = ButtonBuilder.from(c).setDisabled(true);
             disabledRow.addComponents(btn);
           });
           sent.edit({ components: [disabledRow] }).catch(() => {});
         } catch (e) {
-
           // ignore
-        }});
+        }
+      });
 
       return sent;
     } catch (err) {
@@ -239,18 +239,18 @@ async function sendPage(message, items, page, { titleBase, pageSize, formatLine,
 
   if (page > 0) {
     row.addComponents(
-      new ButtonBuilder().
-      setCustomId(`inv_${titleBase.toLowerCase()}_prev_${page - 1}`).
-      setLabel('← Previous').
-      setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setCustomId(`inv_${titleBase.toLowerCase()}_prev_${page - 1}`)
+        .setLabel('← Previous')
+        .setStyle(ButtonStyle.Primary)
     );
   }
   if (page < totalPages - 1) {
     row.addComponents(
-      new ButtonBuilder().
-      setCustomId(`inv_${titleBase.toLowerCase()}_next_${page + 1}`).
-      setLabel('Next →').
-      setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setCustomId(`inv_${titleBase.toLowerCase()}_next_${page + 1}`)
+        .setLabel('Next →')
+        .setStyle(ButtonStyle.Primary)
     );
   }
 
@@ -287,15 +287,15 @@ async function sendPage(message, items, page, { titleBase, pageSize, formatLine,
   collector.on('end', () => {
     try {
       const disabledRow = new ActionRowBuilder();
-      row.components.forEach((c) => {
+      row.components.forEach(c => {
         const btn = ButtonBuilder.from(c).setDisabled(true);
         disabledRow.addComponents(btn);
       });
       sent.edit({ components: [disabledRow] }).catch(() => {});
     } catch (e) {
-
       // ignore
-    }});
+    }
+  });
 
   return sent;
 }
@@ -319,18 +319,18 @@ async function updatePaginatedMessage(messageToEdit, items, { titleBase = 'Items
 
   if (page > 0) {
     row.addComponents(
-      new ButtonBuilder().
-      setCustomId(`inv_${titleBase.toLowerCase()}_prev_${page - 1}`).
-      setLabel('← Previous').
-      setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setCustomId(`inv_${titleBase.toLowerCase()}_prev_${page - 1}`)
+        .setLabel('← Previous')
+        .setStyle(ButtonStyle.Primary)
     );
   }
   if (page < tp - 1) {
     row.addComponents(
-      new ButtonBuilder().
-      setCustomId(`inv_${titleBase.toLowerCase()}_next_${page + 1}`).
-      setLabel('Next →').
-      setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setCustomId(`inv_${titleBase.toLowerCase()}_next_${page + 1}`)
+        .setLabel('Next →')
+        .setStyle(ButtonStyle.Primary)
     );
   }
 

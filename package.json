@@ -24,6 +24,10 @@
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
+    "@babel/generator": "^7.28.5",
+    "@babel/parser": "^7.28.5",
+    "@babel/traverse": "^7.28.5",
+    "fs-extra": "^11.3.2",
     "sequelize-cli": "^6.6.3"
   }
 }

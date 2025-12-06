@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { buildEmbed, DEFAULT_THEME, replyFromResult } = require('../../utils/reply');
 
@@ -13,9 +13,9 @@ module.exports = {
   async execute(message, args = [], context = {}) {
     try {
       const config = context.config || {};
-      const adminIds = Array.isArray(config.ADMIN_IDS) && config.ADMIN_IDS.length ?
-      config.ADMIN_IDS.join(', ') :
-      (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean).join(', ') || 'None configured';
+      const adminIds = Array.isArray(config.ADMIN_IDS) && config.ADMIN_IDS.length
+        ? config.ADMIN_IDS.join(', ')
+        : (process.env.ADMIN_IDS || '').split(',').map(s => s.trim()).filter(Boolean).join(', ') || 'None configured';
 
       const embed = buildEmbed({
         title: 'Server Admins — Roles & Permissions',

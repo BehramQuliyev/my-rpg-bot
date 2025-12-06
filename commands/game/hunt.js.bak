@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { replyFromResult } = require('../../utils/reply');
 
@@ -43,7 +43,7 @@ module.exports = {
         targetMonsterId = fallback;
       } else {
         const mons = bestRes.data?.monsters || [];
-        targetMonsterId = mons.length ? mons[0].id : storage.monsters[0]?.id || null;
+        targetMonsterId = mons.length ? mons[0].id : (storage.monsters[0]?.id || null);
         if (!targetMonsterId) {
           return replyFromResult(message, { success: false, error: 'No monsters available to hunt.', reason: 'NotFound' }, { label: 'Hunt' });
         }

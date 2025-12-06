@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { replyFromResult, buildEmbed, DEFAULT_THEME } = require('../../utils/reply');
 
@@ -25,7 +25,7 @@ module.exports = {
         const [wRes, gRes] = await Promise.all([storage.getWeapons(userId), storage.getGear(userId)]);
         if (wRes && wRes.success) rows = rows.concat(wRes.data?.items || []);
         if (gRes && gRes.success) rows = rows.concat(gRes.data?.items || []);
-        if (wRes && wRes.success === false || gRes && gRes.success === false) {
+        if ((wRes && wRes.success === false) || (gRes && gRes.success === false)) {
           // Let replyFromResult handle user-facing messaging for failures
           const failed = wRes && wRes.success === false ? wRes : gRes;
           return replyFromResult(message, failed, { label: 'Inventory', errorTitle: 'Error' });
@@ -51,7 +51,7 @@ module.exports = {
       }
 
       // Build display lines (limit 20)
-      const display = rows.slice(0, 20).map((r) => {
+      const display = rows.slice(0, 20).map(r => {
         const id = r.id ?? r.invId ?? 'N/A';
         const name = r.itemName ?? r.item_name ?? r.catalogId ?? 'Unknown';
         const catalog = r.catalogId ?? 'N/A';
