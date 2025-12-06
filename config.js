@@ -1,9 +1,12 @@
-// config.js
+'use strict';
 
 // Prefix (fallback if not set in .env)
 const PREFIX = process.env.PREFIX || '.';
 
-// 🪙 Currency system
+/* ======================
+   Currency system
+   ====================== */
+
 const CURRENCIES = {
   BRONZE: { name: 'Bronze Coins', emoji: '🥉', type: 'basic' },
   SILVER: { name: 'Silver Coins', emoji: '🥈', type: 'mid' },
@@ -11,14 +14,20 @@ const CURRENCIES = {
   GEMS:   { name: 'Gems', emoji: '💎', type: 'special' } // used in Hunt shop
 };
 
-// 🏆 Prestige system
+/* ======================
+   Prestige
+   ====================== */
+
 const PRESTIGE = {
   enabled: true,
   description: 'Prestige resets progress for leaderboard competition',
-  maxLevel: 999 // arbitrary cap, can be infinite
+  maxLevel: 999
 };
 
-// 📊 Leaderboards
+/* ======================
+   Leaderboards
+   ====================== */
+
 const LEADERBOARDS = [
   { key: 'hunt', name: 'Hunt Leaderboard', emoji: '🦖' },
   { key: 'work', name: 'Work Leaderboard', emoji: '⚒️' },
@@ -28,47 +37,62 @@ const LEADERBOARDS = [
   { key: 'collector', name: 'Collector Leaderboard', emoji: '📦' }
 ];
 
-// ⚔️ Gear & Weapons
-// storage.js defines tiers 0..11 (12 tiers). Keep TIERS consistent with storage.
+/* ======================
+   Tiers & rarities
+   ====================== */
+
+// storage.js defines tiers 0..11 (12 tiers). Keep consistent here.
 const TIERS = 12; // 0–11
 
 const RARITIES = [
-  { key: 'brown', name: 'Brown', emoji: '🟤', tier: 0 }, // starter rarity
+  { key: 'brown', name: 'Brown', emoji: '🟤', tier: 0 },
   { key: 'common', name: 'Common', emoji: '⚪' },
   { key: 'uncommon', name: 'Uncommon', emoji: '🟢' },
   { key: 'rare', name: 'Rare', emoji: '🔵' },
   { key: 'epic', name: 'Epic', emoji: '🟣' },
   { key: 'legendary', name: 'Legendary', emoji: '🟡' },
-  { key: 'mystical', name: 'Mystical', emoji: '✨' } // matches highest tier in storage.js
+  { key: 'mystical', name: 'Mystical', emoji: '✨' }
 ];
 
-// 🐉 Hunt system
-// This is a lightweight UI helper; actual monster catalog lives in storage.js
+/* ======================
+   Hunt UI helpers
+   ====================== */
+
 const HUNT_MONSTERS = Array.from({ length: TIERS }, (_, i) => ({
   tier: i,
   name: `Monster Tier ${i}`,
   reward: `${i * 5} 💎 Gems`
 }));
 
-// ⏱️ Cooldowns
-// Values are in milliseconds. Storage helpers use seconds for some logic; convert as needed.
-const COOLDOWNS = {
-  hunt: 60 * 1000,            // 1 minute
-  work: 5 * 60 * 1000,        // 5 minutes
-  quest: 10 * 60 * 1000,      // 10 minutes
-  auction: 30 * 60 * 1000,    // 30 minutes
-  trade: 60 * 1000,           // 1 minute
-  collector: 24 * 60 * 60 * 1000 // daily
+/* ======================
+   Cooldowns (seconds & ms)
+   ====================== */
+
+// Primary representation (seconds) to match storage.js logic
+const COOLDOWNS_SEC = {
+  hunt: 60,                 // 1 minute
+  work: 5 * 60,             // 5 minutes (UI-only; storage has its own 9h/3h logic)
+  quest: 10 * 60,           // 10 minutes
+  auction: 30 * 60,         // 30 minutes
+  trade: 60,                // 1 minute
+  collector: 24 * 60 * 60   // daily
 };
 
-// 🎨 Embed theme colors
+// Convenience in milliseconds for UI timers/interactions
+const COOLDOWNS_MS = Object.fromEntries(
+  Object.entries(COOLDOWNS_SEC).map(([k, v]) => [k, v * 1000])
+);
+
+/* ======================
+   Theme (reply.js compatible)
+   ====================== */
+
 const COLORS = {
   INFO: 0x3498db,
   SUCCESS: 0x2ecc71,
   ERROR: 0xe74c3c
 };
 
-// 🔤 Emoji map
 const EMOJIS = {
   INFO: 'ℹ️',
   SUCCESS: '✅',
@@ -84,8 +108,34 @@ const EMOJIS = {
   COLLECTOR: '📦'
 };
 
-// 🏷️ Global footer
 const GLOBAL_FOOTER = '⚔️ Powered by FUNTAN Bot';
+
+// Unified theme object used by reply.js buildEmbed
+const THEME = {
+  COLORS: {
+    INFO: 0x3498db,
+    SUCCESS: 0x2ecc71,
+    ERROR: 0xe74c3c
+  },
+  EMOJIS: {
+    INFO: 'ℹ️',
+    SUCCESS: '✅',
+    ERROR: '⚠️'
+  },
+  FOOTER: '⚔️ Powered by FUNTAN Bot'
+};
+
+/* ======================
+   Helpers
+   ====================== */
+
+function getTheme(overrides = {}) {
+  // Shallow merge to allow runtime tweaks
+  const colors = overrides.COLORS ? { ...COLORS, ...overrides.COLORS } : COLORS;
+  const emojis = overrides.EMOJIS ? { ...EMOJIS, ...overrides.EMOJIS } : EMOJIS;
+  const footer = overrides.FOOTER || GLOBAL_FOOTER;
+  return { COLORS: colors, EMOJIS: emojis, FOOTER: footer };
+}
 
 module.exports = {
   PREFIX,
@@ -95,8 +145,11 @@ module.exports = {
   TIERS,
   RARITIES,
   HUNT_MONSTERS,
-  COOLDOWNS,
+  COOLDOWNS_SEC,
+  COOLDOWNS_MS,
   COLORS,
   EMOJIS,
-  GLOBAL_FOOTER
+  GLOBAL_FOOTER,
+  THEME,
+  getTheme
 };

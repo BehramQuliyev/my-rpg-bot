@@ -1,8 +1,7 @@
-// main.js
 'use strict';
 
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, ButtonBuilder, ActionRowBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -15,7 +14,7 @@ if (!envCheck.success) {
 }
 const ENV = envCheck.config;
 
-// Import storage (refactored storage.js)
+// Import storage (unified return shape)
 const storage = require('./utils/storage');
 
 // Use validated values
@@ -38,7 +37,10 @@ if (!fs.existsSync(commandsPath)) {
   process.exit(1);
 }
 
-// Recursively load command files (skips /admin when DEV_MODE=false)
+/* ======================
+   Command loader
+   ====================== */
+
 function loadCommands(folder) {
   for (const entry of fs.readdirSync(folder)) {
     const full = path.join(folder, entry);
@@ -46,7 +48,7 @@ function loadCommands(folder) {
 
     if (stat.isDirectory()) {
       if (!DEV_MODE && entry.toLowerCase() === 'admin') {
-        console.log('Skipping admin commands (DEV_MODE=false)');
+        console.log('Skipping admin commands (DEV_MODE=false):', full);
         continue;
       }
       loadCommands(full);
@@ -85,7 +87,10 @@ function loadCommands(folder) {
 
 loadCommands(commandsPath);
 
-// Graceful shutdown for the Discord client (complements storage.setupGracefulShutdown)
+/* ======================
+   Graceful shutdown
+   ====================== */
+
 let _clientShutdownHooked = false;
 function setupClientShutdown() {
   if (_clientShutdownHooked) return;
@@ -98,9 +103,12 @@ function setupClientShutdown() {
         await client.destroy();
         console.log('Discord client logged out');
       }
-      // Ensure storage shutdown hook is invoked (it will close DB)
-      if (typeof storage.setupGracefulShutdown === 'function') {
-        storage.setupGracefulShutdown();
+      // Close DB connection gracefully
+      try {
+        await storage.sequelize.close();
+        console.log('Database connection closed');
+      } catch (dbErr) {
+        console.error('Error closing DB connection:', dbErr);
       }
       process.exit(0);
     } catch (err) {
@@ -120,19 +128,26 @@ function setupClientShutdown() {
   });
 }
 
-// Wire client ready handler
+/* ======================
+   Ready event
+   ====================== */
+
 client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag} | id=${client.user.id} | PID=${process.pid} | DEV_MODE=${DEV_MODE}`);
 });
 
-// Message handler: dispatch commands
+/* ======================
+   Message handler
+   ====================== */
+
 client.on('messageCreate', async (message) => {
   try {
     if (!message.content || message.author.bot) return;
     if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
+    const commandName = args.shift()?.toLowerCase();
+    if (!commandName) return;
 
     const command = client.commands.get(commandName);
     if (!command) return;
@@ -140,7 +155,7 @@ client.on('messageCreate', async (message) => {
     // Debug: log invocation
     console.log(`> Command invoked: ${command.name} (alias: ${commandName}) by ${message.author.tag} [${message.author.id}]`);
 
-    // Wrap message.reply to track whether a reply occurred
+    // Track whether the command sent a reply
     const origReply = message.reply.bind(message);
     let replied = false;
     message.reply = async (...rArgs) => {
@@ -148,13 +163,38 @@ client.on('messageCreate', async (message) => {
       return origReply(...rArgs);
     };
 
+    // Build a consistent context object for commands
+    const ctx = {
+      client,
+      DEV_MODE,
+      storage,
+      config: ENV,
+      prefix: PREFIX,
+      authorId: message.author.id,
+      channelId: message.channel?.id,
+      guildId: message.guild?.id
+    };
+
     try {
-      await command.execute(message, args, { client, DEV_MODE, storage, config: ENV });
+      // Execute the command
+      const result = await command.execute(message, args, ctx);
+
+      // If the command returns a unified result and hasn't replied, we can optionally handle here.
+      if (!replied && result && typeof result === 'object' && 'success' in result) {
+        // Lazy import to avoid cyclic deps in tests
+        const { replyFromResult } = require('./commands/utils/reply');
+        await replyFromResult(message, result, {
+          label: `/${command.name}`,
+          successTitle: 'Success',
+          infoTitle: 'Info',
+          errorTitle: 'Error'
+        });
+        replied = true;
+      }
+
       console.log(`< Command executed OK: ${command.name} for ${message.author.tag}`);
     } catch (cmdErr) {
-      console.error(`< Command ${command.name} threw:`, cmdErr && cmdErr.stack ? cmdErr.stack : cmdErr);
-      // Do not send a generic user-facing reply here; commands should handle UX.
-      // If you want a fallback reply when the command threw and didn't reply, you can:
+      console.error(`< Command ${command.name} threw:`, cmdErr?.stack || cmdErr);
       if (!replied) {
         try {
           await origReply('❌ There was an internal error executing that command.');
@@ -163,15 +203,17 @@ client.on('messageCreate', async (message) => {
         }
       }
     } finally {
-      // Restore original reply so we don't leak the wrapper into other event handlers.
       message.reply = origReply;
     }
   } catch (error) {
-    console.error('messageCreate top-level error:', error && error.stack ? error.stack : error);
+    console.error('messageCreate top-level error:', error?.stack || error);
   }
 });
 
-// Handle catalog pagination buttons
+/* ======================
+   Interaction handler (catalog pagination)
+   ====================== */
+
 client.on('interactionCreate', async (interaction) => {
   try {
     if (!interaction.isButton()) return;
@@ -179,18 +221,18 @@ client.on('interactionCreate', async (interaction) => {
 
     const [, direction, pageStr] = interaction.customId.split('_');
     const page = parseInt(pageStr, 10);
-    if (isNaN(page)) return;
+    if (Number.isNaN(page)) return;
 
     const { weapons, gear } = require('./utils/storage');
-    
-    // Determine if it's weapon or gear based on original message author and context
-    // For simplicity, we'll rebuild from scratch (or you can store pages in a Map)
+
+    // Detect whether this embed is for weapon or gear
     const isWeapon = interaction.message.embeds[0]?.title?.includes('Weapon');
-    
-    const filtered = isWeapon 
+
+    // Filter out mystical tier if you want to keep pagination tight
+    const filtered = isWeapon
       ? weapons.filter(w => w.tier !== 11)
       : gear.filter(g => g.tier !== 11);
-    
+
     const byTier = {};
     filtered.forEach(item => {
       byTier[item.tier] = byTier[item.tier] || [];
@@ -202,10 +244,10 @@ client.on('interactionCreate', async (interaction) => {
 
     for (let i = 0; i < tiers.length; i += 2) {
       const pageTiers = tiers.slice(i, i + 2);
-      let description = isWeapon 
+      let description = isWeapon
         ? `⚔️ **Weapons** — ${filtered.length} items\n\n`
         : `🛡️ **Gear** — ${filtered.length} items\n\n`;
-      
+
       for (const tier of pageTiers) {
         description += `**🔰 Tier ${tier}**\n`;
         byTier[tier].forEach(item => {
@@ -221,8 +263,6 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (page >= 0 && page < pages.length) {
-      const { ButtonBuilder, ActionRowBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-      
       const embed = new EmbedBuilder()
         .setColor(0x3498db)
         .setTitle(`${interaction.message.embeds[0].title.split(' (Page')[0]} (Page ${page + 1}/${pages.length})`)
@@ -256,15 +296,18 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
   } catch (err) {
-    console.error('Catalog button interaction error:', err);
+    console.error('Catalog button interaction error:', err?.stack || err);
   }
 });
 
-// Start sequence: init DB then login
+/* ======================
+   Startup sequence
+   ====================== */
+
 (async () => {
   try {
-    // Initialize DB (safe defaults). Adjust syncOptions as needed.
-    const initRes = await storage.initDb({ syncOptions: {} });
+    // Initialize DB (safe defaults)
+    const initRes = await storage.initDb();
     if (!initRes || !initRes.success) {
       console.error('Database initialization failed:', initRes);
       process.exit(1);
@@ -282,7 +325,7 @@ client.on('interactionCreate', async (interaction) => {
 
     await client.login(token);
   } catch (err) {
-    console.error('Startup failed:', err);
+    console.error('Startup failed:', err?.stack || err);
     process.exit(1);
   }
 })();
