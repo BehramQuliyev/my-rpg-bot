@@ -122,7 +122,7 @@ function setupClientShutdown() {
 
 // Wire client ready handler
 client.once('ready', () => {
-  console.log(`✅ Logged in as ${client.user.tag} | DEV_MODE=${DEV_MODE}`);
+  console.log(`✅ Logged in as ${client.user.tag} | id=${client.user.id} | PID=${process.pid} | DEV_MODE=${DEV_MODE}`);
 });
 
 // Message handler: dispatch commands
@@ -137,15 +137,126 @@ client.on('messageCreate', async (message) => {
     const command = client.commands.get(commandName);
     if (!command) return;
 
-    // Provide storage, ENV and DEV_MODE to commands so they can call refactored helpers
-    await command.execute(message, args, { client, DEV_MODE, storage, config: ENV });
-  } catch (error) {
-    console.error('Command execution error:', error);
+    // Debug: log invocation
+    console.log(`> Command invoked: ${command.name} (alias: ${commandName}) by ${message.author.tag} [${message.author.id}]`);
+
+    // Wrap message.reply to track whether a reply occurred
+    const origReply = message.reply.bind(message);
+    let replied = false;
+    message.reply = async (...rArgs) => {
+      replied = true;
+      return origReply(...rArgs);
+    };
+
     try {
-      if (message && message.channel) await message.reply('❌ There was an error executing that command.');
-    } catch (replyErr) {
-      console.error('Failed to send error reply:', replyErr);
+      await command.execute(message, args, { client, DEV_MODE, storage, config: ENV });
+      console.log(`< Command executed OK: ${command.name} for ${message.author.tag}`);
+    } catch (cmdErr) {
+      console.error(`< Command ${command.name} threw:`, cmdErr && cmdErr.stack ? cmdErr.stack : cmdErr);
+      // Do not send a generic user-facing reply here; commands should handle UX.
+      // If you want a fallback reply when the command threw and didn't reply, you can:
+      if (!replied) {
+        try {
+          await origReply('❌ There was an internal error executing that command.');
+        } catch (err) {
+          console.error('Fallback reply failed:', err);
+        }
+      }
+    } finally {
+      // Restore original reply so we don't leak the wrapper into other event handlers.
+      message.reply = origReply;
     }
+  } catch (error) {
+    console.error('messageCreate top-level error:', error && error.stack ? error.stack : error);
+  }
+});
+
+// Handle catalog pagination buttons
+client.on('interactionCreate', async (interaction) => {
+  try {
+    if (!interaction.isButton()) return;
+    if (!interaction.customId.startsWith('catalog_')) return;
+
+    const [, direction, pageStr] = interaction.customId.split('_');
+    const page = parseInt(pageStr, 10);
+    if (isNaN(page)) return;
+
+    const { weapons, gear } = require('./utils/storage');
+    
+    // Determine if it's weapon or gear based on original message author and context
+    // For simplicity, we'll rebuild from scratch (or you can store pages in a Map)
+    const isWeapon = interaction.message.embeds[0]?.title?.includes('Weapon');
+    
+    const filtered = isWeapon 
+      ? weapons.filter(w => w.tier !== 11)
+      : gear.filter(g => g.tier !== 11);
+    
+    const byTier = {};
+    filtered.forEach(item => {
+      byTier[item.tier] = byTier[item.tier] || [];
+      byTier[item.tier].push(item);
+    });
+
+    const tiers = Object.keys(byTier).map(Number).sort((a, b) => a - b);
+    const pages = [];
+
+    for (let i = 0; i < tiers.length; i += 2) {
+      const pageTiers = tiers.slice(i, i + 2);
+      let description = isWeapon 
+        ? `⚔️ **Weapons** — ${filtered.length} items\n\n`
+        : `🛡️ **Gear** — ${filtered.length} items\n\n`;
+      
+      for (const tier of pageTiers) {
+        description += `**🔰 Tier ${tier}**\n`;
+        byTier[tier].forEach(item => {
+          if (isWeapon) {
+            description += `• **${item.name}** ⚔️ — _${item.rarity}_ • ATK: **${item.attack}**\n`;
+          } else {
+            description += `• **${item.name}** 🛡️ — _${item.rarity}_ • DEF: **${item.defense}**\n`;
+          }
+        });
+        description += '\n';
+      }
+      pages.push(description.trim());
+    }
+
+    if (page >= 0 && page < pages.length) {
+      const { ButtonBuilder, ActionRowBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+      
+      const embed = new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle(`${interaction.message.embeds[0].title.split(' (Page')[0]} (Page ${page + 1}/${pages.length})`)
+        .setDescription(pages[page])
+        .setFooter({ text: '⚔️ Powered by Funtan Bot' })
+        .setTimestamp();
+
+      const row = new ActionRowBuilder();
+
+      if (page > 0) {
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`catalog_prev_${page - 1}`)
+            .setLabel('← Previous')
+            .setStyle(ButtonStyle.Primary)
+        );
+      }
+
+      if (page < pages.length - 1) {
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`catalog_next_${page + 1}`)
+            .setLabel('Next →')
+            .setStyle(ButtonStyle.Primary)
+        );
+      }
+
+      await interaction.update({
+        embeds: [embed],
+        components: [row]
+      });
+    }
+  } catch (err) {
+    console.error('Catalog button interaction error:', err);
   }
 });
 

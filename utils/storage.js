@@ -276,12 +276,29 @@ const gear = [
 
 const monsters = [
   { id: 'slime', name: 'Slime', tier: 0, threshold: 1, gems: 1 },
-  { id: 'wolf', name: 'Wolf', tier: 1, threshold: 6, gems: 2 },
-  { id: 'bandit', name: 'Bandit', tier: 1, threshold: 8, gems: 3 },
-  { id: 'orc', name: 'Orc', tier: 2, threshold: 12, gems: 4 },
-  { id: 'troll', name: 'Troll', tier: 3, threshold: 18, gems: 6 },
-  { id: 'wyvern', name: 'Wyvern', tier: 5, threshold: 26, gems: 10 },
-  { id: 'dragon', name: 'Dragon', tier: 9, threshold: 48, gems: 50 }
+  { id: 'rat', name: 'Sewer Rat', tier: 0, threshold: 2, gems: 1 },
+  { id: 'goblin', name: 'Goblin', tier: 1, threshold: 5, gems: 2 },
+  { id: 'skeleton', name: 'Skeleton', tier: 1, threshold: 6, gems: 2 },
+  { id: 'zombie', name: 'Zombie', tier: 2, threshold: 10, gems: 3 },
+  { id: 'bandit', name: 'Bandit', tier: 2, threshold: 12, gems: 3 },
+  { id: 'orc', name: 'Orc', tier: 3, threshold: 16, gems: 4 },
+  { id: 'ogre', name: 'Ogre', tier: 3, threshold: 18, gems: 4 },
+  { id: 'troll', name: 'Troll', tier: 4, threshold: 22, gems: 5 },
+  { id: 'harpy', name: 'Harpy', tier: 4, threshold: 24, gems: 5 },
+  { id: 'wyvern', name: 'Wyvern', tier: 5, threshold: 28, gems: 6 },
+  { id: 'basilisk', name: 'Basilisk', tier: 5, threshold: 30, gems: 6 },
+  { id: 'golem', name: 'Stone Golem', tier: 6, threshold: 34, gems: 8 },
+  { id: 'banshee', name: 'Banshee', tier: 6, threshold: 36, gems: 8 },
+  { id: 'vampire', name: 'Vampire', tier: 7, threshold: 40, gems: 10 },
+  { id: 'werewolf', name: 'Werewolf', tier: 7, threshold: 42, gems: 10 },
+  { id: 'lich', name: 'Lich', tier: 8, threshold: 46, gems: 12 },
+  { id: 'chimera', name: 'Chimera', tier: 8, threshold: 48, gems: 12 },
+  { id: 'dragon', name: 'Dragon', tier: 9, threshold: 52, gems: 15 },
+  { id: 'hydra', name: 'Hydra', tier: 9, threshold: 54, gems: 15 },
+  { id: 'phoenix', name: 'Phoenix', tier: 10, threshold: 58, gems: 18 },
+  { id: 'leviathan', name: 'Leviathan', tier: 10, threshold: 60, gems: 18 },
+  { id: 'titan', name: 'Titan', tier: 11, threshold: 65, gems: 20 },
+  { id: 'voidbeast', name: 'Void Beast', tier: 11, threshold: 70, gems: 25 }
 ];
 
 /* ======================

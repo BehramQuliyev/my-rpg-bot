@@ -32,22 +32,20 @@ async function safeSendEmbed(message, embed) {
   try {
     // Prefer reply to keep threading/mentions consistent
     return await message.reply({ embeds: [embed] });
-  } catch (err) {
-    // Fallback to channel.send (works in guild channels)
+  } catch (err1) {
+    // Only fall back to channel.send if reply truly failed
     try {
       if (message.channel && typeof message.channel.send === 'function') {
         return await message.channel.send({ embeds: [embed] });
       }
     } catch (err2) {
-      // As a last resort, try a plain text reply
-      try {
-        return await message.reply(embed.data.description || 'Unable to send embed.');
-      } catch (err3) {
-        // Give up silently but log for debugging
-        console.error('Failed to send embed or fallback text:', err, err2, err3);
-        return null;
-      }
+      // Both failed; log but do NOT try to send plain text (avoids triple replies)
+      console.error('Failed to send embed (reply & channel.send both failed):', err1.message, err2.message);
+      return null;
     }
+    // If channel.send not available, just log
+    console.error('Failed to send embed (no fallback available):', err1.message);
+    return null;
   }
 }
 

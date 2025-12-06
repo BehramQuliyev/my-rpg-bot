@@ -1,22 +1,20 @@
 // commands/game/inventory.js
 'use strict';
 
+const { replyInfo, replyError } = require('../../utils/reply');
+
 module.exports = {
   name: 'inventory',
   description: 'List your inventory (weapons & gear)',
   aliases: ['inv'],
-  /**
-   * execute(message, args, context)
-   * context: { client, DEV_MODE, storage, config }
-   */
   async execute(message, args = [], context = {}) {
-    try {
-      const { storage } = context;
-      if (!storage || typeof storage.getWeapons !== 'function' || typeof storage.getGear !== 'function') {
-        console.error('storage inventory helpers are not available in command context');
-        return await message.reply('❌ Bot storage is not available. Try again later.');
-      }
+    const { storage } = context;
+    if (!storage || typeof storage.getWeapons !== 'function' || typeof storage.getGear !== 'function') {
+      console.error('storage inventory helpers are not available in command context');
+      return await replyError(message, 'Bot storage is not available. Try again later.', 'Error');
+    }
 
+    try {
       const userId = message.author.id;
       const type = args[0] ? String(args[0]).toLowerCase() : null;
 
@@ -26,7 +24,6 @@ module.exports = {
         const gRes = await storage.getGear(userId);
         if (wRes && wRes.success) rows = rows.concat(wRes.items || []);
         if (gRes && gRes.success) rows = rows.concat(gRes.items || []);
-        // If either call failed, log it
         if ((wRes && wRes.success === false) || (gRes && gRes.success === false)) {
           console.error('One or more inventory fetches failed:', { weapons: wRes, gear: gRes });
         }
@@ -34,25 +31,24 @@ module.exports = {
         const wRes = await storage.getWeapons(userId);
         if (!wRes || wRes.success === false) {
           console.error('getWeapons failed:', wRes && wRes.error ? wRes.error : wRes);
-          return message.reply('❌ Could not fetch weapons right now. Please try again later.');
+          return await replyError(message, 'Could not fetch weapons right now. Please try again later.', 'Error');
         }
         rows = wRes.items || [];
       } else if (type === 'gear') {
         const gRes = await storage.getGear(userId);
         if (!gRes || gRes.success === false) {
           console.error('getGear failed:', gRes && gRes.error ? gRes.error : gRes);
-          return message.reply('❌ Could not fetch gear right now. Please try again later.');
+          return await replyError(message, 'Could not fetch gear right now. Please try again later.', 'Error');
         }
         rows = gRes.items || [];
       } else {
-        return message.reply('Invalid type. Use `.inventory weapon` or `.inventory gear`.');
+        return await replyError(message, 'Invalid type. Use `.inventory weapon` or `.inventory gear`.', 'Invalid Type');
       }
 
       if (!Array.isArray(rows) || rows.length === 0) {
-        return message.reply('Your inventory is empty.');
+        return await replyInfo(message, 'Your inventory is empty.', 'Inventory');
       }
 
-      // Format output (limit to 20 items)
       const display = rows.slice(0, 20).map(r => {
         const id = r.id ?? r.invId ?? 'N/A';
         const name = r.itemName ?? r.item_name ?? r.catalogId ?? 'Unknown';
@@ -64,15 +60,11 @@ module.exports = {
         return `ID:${id} • ${name} (${catalog}) • ${itemType} • x${count} • atk:${atk} def:${def}`;
       });
 
-      const reply = `**${message.author.username}'s Inventory**\n${display.join('\n')}\n_Showing ${Math.min(rows.length, 20)} of ${rows.length}_`;
-      return message.reply(reply);
+      const desc = `${display.join('\n')}\n_Showing ${Math.min(rows.length, 20)} of ${rows.length}_`;
+      return await replyInfo(message, desc, 'Inventory');
     } catch (err) {
       console.error('inventory command error:', err);
-      try {
-        await message.reply('❌ An unexpected error occurred while fetching your inventory. Please try again later.');
-      } catch (replyErr) {
-        console.error('Failed to send error reply:', replyErr);
-      }
+      return await replyError(message, 'An unexpected error occurred while fetching your inventory. Please try again later.', 'Error');
     }
   }
 };
