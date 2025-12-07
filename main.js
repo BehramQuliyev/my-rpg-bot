@@ -1,9 +1,22 @@
 'use strict';
 
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, ButtonBuilder, ActionRowBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+
 const fs = require('fs');
 const path = require('path');
+const {
+  Client,
+  GatewayIntentBits,
+  Collection,
+  ButtonBuilder,
+  ActionRowBuilder,
+  ButtonStyle,
+  EmbedBuilder
+} = require('discord.js');
+
+const { validateEnv } = require('./env-validate');
+const storage = require('./utils/storage');
+const { replyFromResult } = require('./utils/reply'); // used by fallback in dispatcher
 
 console.log('Starting bot, NODE_ENV=', process.env.NODE_ENV);
 console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
@@ -17,16 +30,12 @@ process.on('unhandledRejection', err => {
 });
 
 // Validate environment early
-const { validateEnv } = require('./env-validate');
 const envCheck = validateEnv();
 if (!envCheck.success) {
   console.error('Environment validation failed:\n', envCheck.errors.join('\n'));
   process.exit(1);
 }
 const ENV = envCheck.config;
-
-// Import storage (unified return shape)
-const storage = require('./utils/storage');
 
 // Use validated values
 const PREFIX = ENV.PREFIX || '.';
@@ -69,6 +78,8 @@ function loadCommands(folder) {
     if (!entry.endsWith('.js')) continue;
 
     try {
+      // require the module fresh (helps during dev reloads)
+      delete require.cache[require.resolve(full)];
       const command = require(full);
 
       // Validate shape
@@ -111,16 +122,24 @@ function setupClientShutdown() {
     try {
       console.log('Shutting down: logging out Discord client...');
       if (client && client.isReady()) {
-        await client.destroy();
-        console.log('Discord client logged out');
+        try {
+          await client.destroy();
+          console.log('Discord client logged out');
+        } catch (err) {
+          console.error('Error destroying Discord client:', err);
+        }
       }
-      // Close DB connection gracefully
+
+      // Close DB connection gracefully if available
       try {
-        await storage.sequelize.close();
-        console.log('Database connection closed');
+        if (storage && storage.sequelize && typeof storage.sequelize.close === 'function') {
+          await storage.sequelize.close();
+          console.log('Database connection closed');
+        }
       } catch (dbErr) {
         console.error('Error closing DB connection:', dbErr);
       }
+
       process.exit(0);
     } catch (err) {
       console.error('Error during shutdown:', err);
@@ -157,7 +176,7 @@ client.on('messageCreate', async (message) => {
     if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const commandName = args.shift()?.toLowerCase();
+    const commandName = (args.shift() || '').toLowerCase();
     if (!commandName) return;
 
     const command = client.commands.get(commandName);
@@ -179,15 +198,21 @@ client.on('messageCreate', async (message) => {
     };
 
     try {
-      // Execute the command
+      // Execute the command (commands must handle their own replies)
       await command.execute(message, args, ctx);
-      // NOTE: commands themselves should call replyFromResult or message.reply.
-      // We no longer auto-reply here to avoid duplicate responses.
       console.log(`< Command executed OK: ${command.name} for ${message.author.tag}`);
     } catch (cmdErr) {
       console.error(`< Command ${command.name} threw:`, cmdErr?.stack || cmdErr);
       try {
-        await message.reply('❌ There was an internal error executing that command.');
+        // Try to use replyFromResult for consistent UX; fallback to simple reply
+        if (replyFromResult && typeof replyFromResult === 'function') {
+          await replyFromResult(message, { success: false, error: 'There was an internal error executing that command.' }, {
+            label: command.name || 'Command',
+            errorTitle: 'Error'
+          });
+        } else {
+          await message.reply('❌ There was an internal error executing that command.');
+        }
       } catch (err) {
         console.error('Fallback reply failed:', err);
       }
@@ -204,16 +229,20 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
   try {
     if (!interaction.isButton()) return;
-    if (!interaction.customId.startsWith('catalog_')) return;
+    if (!interaction.customId || !interaction.customId.startsWith('catalog_')) return;
 
-    const [, direction, pageStr] = interaction.customId.split('_');
+    const parts = interaction.customId.split('_'); // expected: ['catalog','prev','1'] or ['catalog','next','2']
+    if (parts.length < 3) return;
+    const pageStr = parts[2];
     const page = parseInt(pageStr, 10);
     if (Number.isNaN(page)) return;
 
-    const { weapons, gear } = require('./utils/storage');
+    // Load catalog data from storage module
+    const { weapons = [], gear = [] } = require('./utils/storage');
 
     // Detect whether this embed is for weapon or gear
-    const isWeapon = interaction.message.embeds[0]?.title?.includes('Weapon');
+    const embedTitle = interaction.message?.embeds?.[0]?.title || '';
+    const isWeapon = embedTitle.toLowerCase().includes('weapon');
 
     // Filter out mystical tier if you want to keep pagination tight
     const filtered = isWeapon
@@ -250,9 +279,10 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (page >= 0 && page < pages.length) {
+      const baseTitle = embedTitle.split(' (Page')[0] || (isWeapon ? 'Weapon Catalog' : 'Gear Catalog');
       const embed = new EmbedBuilder()
         .setColor(0x3498db)
-        .setTitle(`${interaction.message.embeds[0].title.split(' (Page')[0]} (Page ${page + 1}/${pages.length})`)
+        .setTitle(`${baseTitle} (Page ${page + 1}/${pages.length})`)
         .setDescription(pages[page])
         .setFooter({ text: '⚔️ Powered by Funtan Bot' })
         .setTimestamp();
@@ -277,10 +307,20 @@ client.on('interactionCreate', async (interaction) => {
         );
       }
 
-      await interaction.update({
-        embeds: [embed],
-        components: [row]
-      });
+      try {
+        await interaction.update({
+          embeds: [embed],
+          components: row.components.length ? [row] : []
+        });
+      } catch (updateErr) {
+        console.error('Failed to update interaction:', updateErr);
+        // If update fails, try to reply ephemeral to avoid leaving the interaction unacknowledged
+        try {
+          await interaction.reply({ content: 'Failed to update catalog page.', ephemeral: true });
+        } catch (replyErr) {
+          console.error('Failed to reply to interaction after update failure:', replyErr);
+        }
+      }
     }
   } catch (err) {
     console.error('Catalog button interaction error:', err?.stack || err);
@@ -300,3 +340,5 @@ client.login(process.env.DISCORD_TOKEN)
     // keep process alive briefly so PM2 logs show the error, then exit if needed
     setTimeout(() => process.exit(1), 2000);
   });
+
+module.exports = client;
