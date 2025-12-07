@@ -16,7 +16,7 @@ module.exports = {
 
     const res = await storage.startWork(message.author.id);
 
-    return replyFromResult(message, res, {
+    await replyFromResult(message, res, {
       label: 'Work start',
       successTitle: 'Work started',
       successDescription: (d) => {

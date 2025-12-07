@@ -129,7 +129,7 @@ module.exports = {
 
         try {
           const rec = await storage.addServerAdmin(serverId, targetId, role);
-          return replyFromResult(message, rec, {
+          await replyFromResult(message, rec, {
             label: 'List Admins',
             successTitle: 'Added',
             successDescription: (d) => {

@@ -35,7 +35,7 @@ module.exports = {
 
       if (slot === 'weapon') {
         const res = await storage.equipWeaponByInventoryId(userId, inventoryId);
-        return replyFromResult(message, res, {
+        await replyFromResult(message, res, {
           label: 'Equip weapon',
           successTitle: 'Equipped',
           successDescription: (d) => {
@@ -48,7 +48,7 @@ module.exports = {
         });
       } else {
         const res = await storage.equipGearByInventoryId(userId, inventoryId);
-        return replyFromResult(message, res, {
+        await replyFromResult(message, res, {
           label: 'Equip gear',
           successTitle: 'Equipped',
           successDescription: (d) => {

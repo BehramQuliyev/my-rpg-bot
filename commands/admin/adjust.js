@@ -75,7 +75,7 @@ module.exports = {
       const res = await storage.adminAdjustCurrency(targetId, { [currency]: amount });
 
       // Use replyFromResult to handle errors; on success provide a custom successDescription
-      return replyFromResult(message, res, {
+      await replyFromResult(message, res, {
         label: 'Adjust',
         successTitle: 'Adjusted',
         successDescription: (d) => {

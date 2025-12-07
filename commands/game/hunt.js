@@ -53,7 +53,7 @@ module.exports = {
     // Execute hunt
     const res = await storage.hunt(userId, targetMonsterId);
 
-    return replyFromResult(message, res, {
+    await replyFromResult(message, res, {
       label: 'Hunt',
       successTitle: 'Hunt success',
       successDescription: (d) => `You defeated ${d.monster.name}! +${d.gemsAwarded} gems. Kills in tier: ${d.killsInTier}. New gems: ${d.newGemBalance}`,

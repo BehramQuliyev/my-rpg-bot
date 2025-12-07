@@ -36,7 +36,7 @@ module.exports = {
       if (type === 'weapon' || type === 'gear') {
         const res = type === 'weapon' ? await storage.getWeapons(userId) : await storage.getGear(userId);
         if (!res || res.success === false) {
-          return replyFromResult(message, res || { success: false, error: `Failed to fetch ${type}`, reason: 'Error' }, {
+          await replyFromResult(message, res || { success: false, error: `Failed to fetch ${type}`, reason: 'Error' }, {
             label: 'Inventory',
             errorTitle: 'Error'
           });

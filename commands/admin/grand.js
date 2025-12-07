@@ -77,7 +77,7 @@ module.exports = {
 
       const res = await storage.adminGrantItem(targetId, catalogId, type, qty);
 
-      return replyFromResult(message, res, {
+      await replyFromResult(message, res, {
         label: 'Grant',
         successTitle: 'Granted',
         successDescription: (d) => {

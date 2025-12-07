@@ -16,7 +16,7 @@ module.exports = {
 
     const res = await storage.claimDaily(message.author.id);
 
-    return replyFromResult(message, res, {
+    await replyFromResult(message, res, {
       label: 'Daily claim',
       successTitle: 'Daily',
       successDescription: (d) => {

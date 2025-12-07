@@ -16,10 +16,6 @@ process.on('unhandledRejection', err => {
   console.error('unhandledRejection:', err);
 });
 
-storage.sequelize.authenticate()
-  .then(() => console.log('Database connected'))
-  .catch(err => console.error('Database connection failed:', err));
-
 // Validate environment early
 const { validateEnv } = require('./env-validate');
 const envCheck = validateEnv();

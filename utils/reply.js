@@ -106,7 +106,8 @@ async function replySuccess(message, description, title = 'Success', theme = {})
     color: COLORS.SUCCESS,
     theme
   });
-  return safeSendEmbed(message, embed);
+  await safeSendEmbed(message, embed);
+return; // stop here, don’t return the reply object
 }
 
 async function replyError(message, description, title = 'Error', theme = {}) {
@@ -118,7 +119,9 @@ async function replyError(message, description, title = 'Error', theme = {}) {
     color: COLORS.ERROR,
     theme
   });
-  return safeSendEmbed(message, embed);
+await safeSendEmbed(message, embed);
+return; // stop here, don’t return the reply object
+
 }
 
 async function replyInfo(message, description, title = 'Info', theme = {}) {

@@ -16,7 +16,7 @@ module.exports = {
 
     const res = await storage.collectWork(message.author.id);
 
-    return replyFromResult(message, res, {
+    await replyFromResult(message, res, {
       label: 'Work collect',
       successTitle: 'Rewards collected',
       successDescription: (d) =>

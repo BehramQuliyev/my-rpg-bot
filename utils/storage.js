@@ -786,8 +786,6 @@ async function startWork(userId) {
 
 /**
  * Collect finished work reward
- * Returns unified shape: ok({ totalReward, baseReward, bonus, newSilver, streak })
- * or fail(...) on error / cooldown / no session.
  */
 async function collectWork(userId) {
   try {
@@ -795,87 +793,58 @@ async function collectWork(userId) {
 
     const now = new Date();
 
-    // Run in a transaction to avoid races
     const result = await sequelize.transaction(async (t) => {
-      // Find the most recent session that is working/finished/collected
       const session = await WorkSession.findOne({
-        where: { userId, status: { [Op.in]: ['working', 'finished', 'collected'] } },
+        where: { userId, status: { [Op.in]: ['working', 'finished'] } },
         order: [['createdAt', 'DESC']],
         transaction: t,
         lock: t.LOCK.UPDATE
       });
 
       if (!session) {
-        return fail('No active session', 'NoSession');
+        return fail('No active work session', 'NoSession');
       }
 
-      // If session is still 'working', check remaining time
+      // If still working, check time left
       if (session.status === 'working') {
         const finishAt = new Date(session.finishAt);
         const secondsLeft = Math.max(0, Math.ceil((finishAt.getTime() - now.getTime()) / 1000));
         if (secondsLeft > 0) {
-          const hours = Math.floor(secondsLeft / 3600);
-          const minutes = Math.floor((secondsLeft % 3600) / 60);
-          const seconds = secondsLeft % 60;
-          return fail('Work collect is on cooldown', 'CooldownAfterWork', {
-            remaining: secondsLeft,
-            human: `${hours} hours, ${minutes} minutes, ${seconds} seconds`
-          });
+          return fail('Work collect is on cooldown', 'CooldownAfterWork', { remaining: secondsLeft });
         }
-        // mark finished if time passed
         session.status = 'finished';
         await session.save({ transaction: t });
       }
 
-      // If already collected, return info
-      if (session.status === 'collected') {
-        // load player to return current silver and streak
-        const playerAlready = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
-        return fail('Already collected', 'AlreadyCollected', {
-          message: 'This work session has already been collected',
-          newSilver: playerAlready ? playerAlready.silver : null,
-          streak: playerAlready ? playerAlready.workStreak : null
-        });
-      }
-
-      // At this point session.status === 'finished'
-      // Compute rewards
-      const baseReward = Number(WORK_REWARD_SILVER) || 0;
-
-      // Load player and lock
+      // Load player
       let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
       if (!player) {
-        // create player if missing
         player = await Player.create({ userId }, { transaction: t });
       }
 
-      // Compute streak: if lastWorkCollectedAt within WORK_STREAK_WINDOW_SECONDS, increment streak, else reset to 1
-      let streak = Number(player.workStreak || 0);
+      // Compute streak
+      let newStreak = 1;
       if (player.lastWorkCollectedAt) {
-        const last = new Date(player.lastWorkCollectedAt);
-        const secondsSince = Math.floor((now.getTime() - last.getTime()) / 1000);
+        const secondsSince = Math.floor((now.getTime() - new Date(player.lastWorkCollectedAt).getTime()) / 1000);
         if (secondsSince <= WORK_STREAK_WINDOW_SECONDS) {
-          streak = Math.min(WORK_STREAK_BONUS_CAP_DAYS, streak + 1);
-        } else {
-          streak = 1;
+          newStreak = (player.workStreak || 0) + 1;
+          if (newStreak > WORK_STREAK_BONUS_CAP_DAYS) newStreak = WORK_STREAK_BONUS_CAP_DAYS;
         }
-      } else {
-        streak = 1;
       }
 
-      // Bonus calculation: WORK_STREAK_BONUS_PER_DAY per streak day (capped)
-      const bonus = Math.floor((WORK_STREAK_BONUS_PER_DAY * streak)); // integer bonus silver
-      const totalReward = Math.max(0, baseReward + bonus);
+      const baseReward = WORK_REWARD_SILVER;
+      const bonus = (newStreak - 1) * WORK_STREAK_BONUS_PER_DAY;
+      const totalReward = baseReward + bonus;
 
-      // Apply to player
+      // Update player
       player.silver = (player.silver || 0) + totalReward;
-      player.workStreak = streak;
+      player.workStreak = newStreak;
       player.lastWorkCollectedAt = now;
       await player.save({ transaction: t });
 
       // Update session
-      session.collectedAt = now;
       session.status = 'collected';
+      session.collectedAt = now;
       await session.save({ transaction: t });
 
       return ok({
@@ -883,7 +852,7 @@ async function collectWork(userId) {
         baseReward,
         bonus,
         newSilver: player.silver,
-        streak
+        streak: newStreak
       });
     });
 
