@@ -18,9 +18,9 @@ module.exports = {
 
       const p = PREFIX;
 
-      const adminIdsDisplay = Array.isArray(cfg.ADMIN_IDS) && cfg.ADMIN_IDS.length ?
-      cfg.ADMIN_IDS.join(', ') :
-      (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean).join(', ') || 'None configured';
+      const adminIdsDisplay = Array.isArray(cfg.ADMIN_IDS) && cfg.ADMIN_IDS.length
+        ? cfg.ADMIN_IDS.join(', ')
+        : (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean).join(', ') || 'None configured';
 
       // Build help sections with emojis and short descriptions
       const lines = [];
@@ -74,15 +74,16 @@ module.exports = {
       if (requested) {
         const detail = getCommandDetail(requested, p, DEV_MODE);
         if (detail) {
-          return sendChunkedEmbeds(message, `❓ Help: ${requested}`, detail);
+          await sendChunkedEmbeds(message, `❓ Help: ${requested}`, detail);
+          return;
         }
       }
 
       const text = lines.join('\n');
-      return sendChunkedEmbeds(message, '📜 Help', text);
+      await sendChunkedEmbeds(message, '📜 Help', text);
     } catch (err) {
       console.error('help command error:', err);
-      return replyFromResult(message, { success: false, error: 'Failed to show help. Please try again later.', reason: 'Error' }, {
+      await replyFromResult(message, { success: false, error: 'Failed to show help. Please try again later.', reason: 'Error' }, {
         label: 'Help',
         errorTitle: 'Help Error'
       });
