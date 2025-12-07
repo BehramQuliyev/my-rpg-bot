@@ -15,8 +15,8 @@ const { EmbedBuilder } = require('discord.js');
 const DEFAULT_THEME = {
   COLORS: {
     INFO: 0x3498db,
-    SUCCESS: 0x2ecc71,
-    ERROR: 0xe74c3c
+    SUCCESS: 0x57f287,
+    ERROR: 0xed4245
   },
   EMOJIS: {
     INFO: 'ℹ️',
@@ -35,7 +35,7 @@ function plural(n, unit) {
 }
 
 function formatDuration(seconds) {
-  const s = Math.max(0, Math.floor(seconds));
+  const s = Math.max(0, Math.floor(seconds || 0));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
@@ -52,21 +52,24 @@ function formatDuration(seconds) {
 
 /**
  * Safely send an embed reply. Tries message.reply first, falls back to channel.send.
+ * Always awaits and returns void (commands should not rely on returned value).
  */
 async function safeSendEmbed(message, embed) {
   try {
-    return await message.reply({ embeds: [embed] });
+    await message.reply({ embeds: [embed] });
+    return;
   } catch (err1) {
     try {
       if (message.channel && typeof message.channel.send === 'function') {
-        return await message.channel.send({ embeds: [embed] });
+        await message.channel.send({ embeds: [embed] });
+        return;
       }
     } catch (err2) {
       console.error('Failed to send embed (reply & channel.send failed):', err1?.message, err2?.message);
-      return null;
+      return;
     }
     console.error('Failed to send embed (no fallback available):', err1?.message);
-    return null;
+    return;
   }
 }
 
@@ -79,7 +82,7 @@ function buildEmbed({ title, description, color, footer, timestamp = true, theme
 
   const embed = new EmbedBuilder()
     .setColor(typeof color === 'number' ? color : COLORS.INFO)
-    .setDescription(description || '');
+    .setDescription(typeof description === 'function' ? description() : (description || ''));
 
   if (title) embed.setTitle(title);
   if (FOOTER) embed.setFooter({ text: FOOTER });
@@ -94,7 +97,7 @@ function buildEmbed({ title, description, color, footer, timestamp = true, theme
 
 async function replyEmbed(message, opts = {}) {
   const embed = buildEmbed(opts);
-  return safeSendEmbed(message, embed);
+  await safeSendEmbed(message, embed);
 }
 
 async function replySuccess(message, description, title = 'Success', theme = {}) {
@@ -107,7 +110,6 @@ async function replySuccess(message, description, title = 'Success', theme = {})
     theme
   });
   await safeSendEmbed(message, embed);
-return; // stop here, don’t return the reply object
 }
 
 async function replyError(message, description, title = 'Error', theme = {}) {
@@ -119,9 +121,7 @@ async function replyError(message, description, title = 'Error', theme = {}) {
     color: COLORS.ERROR,
     theme
   });
-await safeSendEmbed(message, embed);
-return; // stop here, don’t return the reply object
-
+  await safeSendEmbed(message, embed);
 }
 
 async function replyInfo(message, description, title = 'Info', theme = {}) {
@@ -133,7 +133,7 @@ async function replyInfo(message, description, title = 'Info', theme = {}) {
     color: COLORS.INFO,
     theme
   });
-  return safeSendEmbed(message, embed);
+  await safeSendEmbed(message, embed);
 }
 
 /* ======================
@@ -200,6 +200,7 @@ function formatResultMessage(res, context = {}) {
 /**
  * Reply using the unified result from storage.js.
  * Automatically picks success/info/error styling.
+ * Always awaits and returns void.
  */
 async function replyFromResult(
   message,
@@ -227,7 +228,8 @@ async function replyFromResult(
       color: COLORS.SUCCESS,
       theme
     });
-    return safeSendEmbed(message, embed);
+    await safeSendEmbed(message, embed);
+    return;
   }
 
   const description = formatResultMessage(res, { label });
@@ -238,7 +240,8 @@ async function replyFromResult(
     color: isInfoReason ? COLORS.INFO : COLORS.ERROR,
     theme
   });
-  return safeSendEmbed(message, embed);
+  await safeSendEmbed(message, embed);
+  return;
 }
 
 module.exports = {
