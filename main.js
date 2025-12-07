@@ -155,14 +155,6 @@ client.on('messageCreate', async (message) => {
     // Debug: log invocation
     console.log(`> Command invoked: ${command.name} (alias: ${commandName}) by ${message.author.tag} [${message.author.id}]`);
 
-    // Track whether the command sent a reply
-    const origReply = message.reply.bind(message);
-    let replied = false;
-    message.reply = async (...rArgs) => {
-      replied = true;
-      return origReply(...rArgs);
-    };
-
     // Build a consistent context object for commands
     const ctx = {
       client,
@@ -177,34 +169,17 @@ client.on('messageCreate', async (message) => {
 
     try {
       // Execute the command
-      const result = await command.execute(message, args, ctx);
-
-      // If the command returned a unified result, main.js handles the reply
-      if (!replied && result && typeof result === 'object' && 'success' in result) {
-        const { replyFromResult } = require('./commands/utils/reply');
-        await replyFromResult(message, result, {
-          label: `/${command.name}`,
-          successTitle: 'Success',
-          infoTitle: 'Info',
-          errorTitle: 'Error'
-        });
-        replied = true;
-      }
-
-
-
+      await command.execute(message, args, ctx);
+      // NOTE: commands themselves should call replyFromResult or message.reply.
+      // We no longer auto-reply here to avoid duplicate responses.
       console.log(`< Command executed OK: ${command.name} for ${message.author.tag}`);
     } catch (cmdErr) {
       console.error(`< Command ${command.name} threw:`, cmdErr?.stack || cmdErr);
-      if (!replied) {
-        try {
-          await origReply('❌ There was an internal error executing that command.');
-        } catch (err) {
-          console.error('Fallback reply failed:', err);
-        }
+      try {
+        await message.reply('❌ There was an internal error executing that command.');
+      } catch (err) {
+        console.error('Fallback reply failed:', err);
       }
-    } finally {
-      message.reply = origReply;
     }
   } catch (error) {
     console.error('messageCreate top-level error:', error?.stack || error);
@@ -300,33 +275,3 @@ client.on('interactionCreate', async (interaction) => {
     console.error('Catalog button interaction error:', err?.stack || err);
   }
 });
-
-/* ======================
-   Startup sequence
-   ====================== */
-
-(async () => {
-  try {
-    // Initialize DB (safe defaults)
-    const initRes = await storage.initDb();
-    if (!initRes || !initRes.success) {
-      console.error('Database initialization failed:', initRes);
-      process.exit(1);
-    }
-
-    // Hook client shutdown handlers
-    setupClientShutdown();
-
-    // Login Discord client using validated token
-    const token = ENV.DISCORD_TOKEN;
-    if (!token) {
-      console.error('DISCORD_TOKEN not set in environment');
-      process.exit(1);
-    }
-
-    await client.login(token);
-  } catch (err) {
-    console.error('Startup failed:', err?.stack || err);
-    process.exit(1);
-  }
-})();

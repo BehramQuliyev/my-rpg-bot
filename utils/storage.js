@@ -16,7 +16,7 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 });
 
 /* ======================
-   Configuration constants
+   Configuration constants (PRODUCTION)
    ====================== */
 
 const DAILY_BASE_BRONZE = 50;
@@ -24,8 +24,8 @@ const DAILY_STREAK_BONUS = 5;
 const DAILY_COOLDOWN_SECONDS = 24 * 60 * 60;
 const DAILY_STREAK_WINDOW_SECONDS = 48 * 60 * 60;
 
-const WORK_DURATION_SECONDS = 9 * 60 * 60;
-const WORK_COOLDOWN_AFTER_COLLECT_SECONDS = 3 * 60 * 60;
+const WORK_DURATION_SECONDS = 9 * 60 * 60; // 9 hours
+const WORK_COOLDOWN_AFTER_COLLECT_SECONDS = 3 * 60 * 60; // 3 hours
 const WORK_REWARD_SILVER = 100;
 const WORK_STREAK_WINDOW_SECONDS = 48 * 60 * 60;
 const WORK_STREAK_BONUS_PER_DAY = 5;
@@ -716,8 +716,9 @@ async function collectWork(userId) {
     const now = new Date();
 
     const result = await sequelize.transaction(async (t) => {
+      // Find the most recent session that is working/finished/collected
       const session = await WorkSession.findOne({
-        where: { userId, status: { [Op.in]: ['working', 'finished'] } },
+        where: { userId, status: { [Op.in]: ['working', 'finished', 'collected'] } },
         order: [['createdAt', 'DESC']],
         transaction: t,
         lock: t.LOCK.UPDATE
@@ -727,11 +728,19 @@ async function collectWork(userId) {
         return fail('No active session', 'NoSession');
       }
 
+      // If session is 'working', check remaining time.
       if (session.status === 'working') {
         const remaining = Math.max(0, Math.floor((new Date(session.finishAt).getTime() - now.getTime()) / 1000));
-        return fail('Still working', 'StillWorking', { remaining });
+        if (remaining > 0) {
+          // Still in progress
+          return fail('Still working', 'StillWorking', { remaining });
+        }
+        // finishAt has passed -> mark as finished and continue to payout
+        session.status = 'finished';
+        await session.save({ transaction: t });
       }
 
+      // If session already collected, enforce cooldown after collect
       if (session.status === 'collected') {
         const collectedAt = session.collectedAt ? new Date(session.collectedAt) : null;
         if (collectedAt) {
@@ -743,10 +752,12 @@ async function collectWork(userId) {
         }
       }
 
+      // Now handle finished session payout
       if (session.status === 'finished') {
         const player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
         if (!player) throw new Error('Player not found');
 
+        // Compute streak
         let newStreak = 1;
         if (player.lastWorkCollectedAt) {
           const secondsSinceLastCollect = Math.floor((now.getTime() - new Date(player.lastWorkCollectedAt).getTime()) / 1000);
@@ -756,10 +767,11 @@ async function collectWork(userId) {
           }
         }
 
-        const bonus = Math.min(WORK_STREAK_BONUS_CAP_DAYS, (newStreak - 1) * WORK_STREAK_BONUS_PER_DAY);
+        const bonus = Math.min(WORK_STREAK_BONUS_CAP_DAYS, Math.max(0, (newStreak - 1) * WORK_STREAK_BONUS_PER_DAY));
         const baseReward = WORK_REWARD_SILVER;
         const totalReward = baseReward + bonus;
 
+        // Update player and session atomically
         player.silver = (player.silver || 0) + totalReward;
         player.workStreak = newStreak;
         player.lastWorkCollectedAt = now;
@@ -778,13 +790,14 @@ async function collectWork(userId) {
         });
       }
 
-      return fail('No finished session', 'NoFinishedSession');
+      // Fallback: no finished session to collect
+      return fail('No finished session to collect', 'NoFinishedSession');
     });
 
     return result;
   } catch (err) {
     console.error('collectWork failed:', err);
-    return fail(err.message || String(err), 'Error');
+    return fail(err.message || 'collectWork error', 'Error');
   }
 }
 
