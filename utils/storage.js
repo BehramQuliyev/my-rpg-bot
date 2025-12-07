@@ -137,6 +137,7 @@ const ServerAdmin = sequelize.define('ServerAdmin', {
    ====================== */
 
 const weapons = [
+  { id: 'w0',  name: 'Training Stick',     tier: 0,  attack: 1,   gems: 0, rarity: 'starter' },
   { id: 'w1',  name: 'Rusty Sword',        tier: 1,  attack: 5,   gems: 0, rarity: 'common' },
   { id: 'w2',  name: 'Wooden Club',        tier: 1,  attack: 6,   gems: 0, rarity: 'common' },
   { id: 'w3',  name: 'Short Dagger',       tier: 2,  attack: 9,   gems: 0, rarity: 'common' },
@@ -160,6 +161,7 @@ const weapons = [
 ];
 
 const gear = [
+  { id: 'g0',  name: 'Ragged Cloth',       tier: 0,  defense: 1,  gems: 0, rarity: 'starter' },
   { id: 'g1',  name: 'Cloth Tunic',        tier: 1,  defense: 2,  gems: 0, rarity: 'common' },
   { id: 'g2',  name: 'Leather Vest',       tier: 1,  defense: 3,  gems: 0, rarity: 'common' },
   { id: 'g3',  name: 'Padded Jacket',      tier: 2,  defense: 6,  gems: 0, rarity: 'common' },
@@ -183,26 +185,27 @@ const gear = [
 ];
 
 const monsters = [
-  { id: 'm1',  name: 'Rat',              tier: 1,  threshold: 15,   gems: 1 },
-  { id: 'm2',  name: 'Wild Boar',        tier: 1,  threshold: 15,   gems: 1 },
-  { id: 'm3',  name: 'Giant Spider',     tier: 2,  threshold: 40,   gems: 1 },
-  { id: 'm4',  name: 'Forest Wolf',      tier: 2,  threshold: 40,   gems: 1 },
-  { id: 'm5',  name: 'Bandit',           tier: 3,  threshold: 75,   gems: 3 },
-  { id: 'm6',  name: 'Ogre Brute',       tier: 3,  threshold: 75,   gems: 3 },
-  { id: 'm7',  name: 'Stone Golem',      tier: 4,  threshold: 120,  gems: 4 },
-  { id: 'm8',  name: 'Warg Rider',       tier: 4,  threshold: 120,  gems: 4 },
-  { id: 'm9',  name: 'Harpy',            tier: 5,  threshold: 175,  gems: 6 },
-  { id: 'm10', name: 'Troll',            tier: 5,  threshold: 175,  gems: 6 },
-  { id: 'm11', name: 'Wyvern',           tier: 6,  threshold: 240,  gems: 8 },
-  { id: 'm12', name: 'Ironclad Knight',  tier: 6,  threshold: 240,  gems: 8 },
-  { id: 'm13', name: 'Basilisk',         tier: 7,  threshold: 315,  gems: 11 },
-  { id: 'm14', name: 'Fire Drake',       tier: 7,  threshold: 315,  gems: 11 },
-  { id: 'm15', name: 'Storm Elemental',  tier: 8,  threshold: 400,  gems: 13 },
-  { id: 'm16', name: 'Titan Warden',     tier: 8,  threshold: 400,  gems: 13 },
-  { id: 'm17', name: 'Leviathan Spawn',  tier: 9,  threshold: 495,  gems: 17 },
-  { id: 'm18', name: 'Void Reaver',      tier: 9,  threshold: 495,  gems: 17 },
-  { id: 'm19', name: 'Ancient Colossus', tier:10,  threshold: 600,  gems: 20 },
-  { id: 'm20', name: 'Mythic Seraph',    tier:11,  threshold: 715,  gems: 24 } // hidden
+  { id: 'm0',  name: 'Field Mouse',      tier: 0,  threshold: 0,    gems: 1 },
+  { id: 'm1',  name: 'Rat',              tier: 1,  threshold: 15,   gems: 2 },
+  { id: 'm2',  name: 'Wild Boar',        tier: 1,  threshold: 15,   gems: 2 },
+  { id: 'm3',  name: 'Giant Spider',     tier: 2,  threshold: 40,   gems: 3 },
+  { id: 'm4',  name: 'Forest Wolf',      tier: 2,  threshold: 40,   gems: 3 },
+  { id: 'm5',  name: 'Bandit',           tier: 3,  threshold: 75,   gems: 5 },
+  { id: 'm6',  name: 'Ogre Brute',       tier: 3,  threshold: 75,   gems: 5 },
+  { id: 'm7',  name: 'Stone Golem',      tier: 4,  threshold: 120,  gems: 7 },
+  { id: 'm8',  name: 'Warg Rider',       tier: 4,  threshold: 120,  gems: 7 },
+  { id: 'm9',  name: 'Harpy',            tier: 5,  threshold: 175,  gems: 10 },
+  { id: 'm10', name: 'Troll',            tier: 5,  threshold: 175,  gems: 10 },
+  { id: 'm11', name: 'Wyvern',           tier: 6,  threshold: 240,  gems: 14 },
+  { id: 'm12', name: 'Ironclad Knight',  tier: 6,  threshold: 240,  gems: 14 },
+  { id: 'm13', name: 'Basilisk',         tier: 7,  threshold: 315,  gems: 19 },
+  { id: 'm14', name: 'Fire Drake',       tier: 7,  threshold: 315,  gems: 19 },
+  { id: 'm15', name: 'Storm Elemental',  tier: 8,  threshold: 400,  gems: 22 },
+  { id: 'm16', name: 'Titan Warden',     tier: 8,  threshold: 400,  gems: 22 },
+  { id: 'm17', name: 'Leviathan Spawn',  tier: 9,  threshold: 495,  gems: 26 },
+  { id: 'm18', name: 'Void Reaver',      tier: 9,  threshold: 495,  gems: 26 },
+  { id: 'm19', name: 'Ancient Colossus', tier:10,  threshold: 600,  gems: 30 },
+  { id: 'm20', name: 'Mythic Seraph',    tier:11,  threshold: 715,  gems: 50 } // hidden
 ];
 
 /* ======================
@@ -215,31 +218,116 @@ function getWeaponById(id) {
 function getGearById(id) {
   return gear.find(g => g.id === id) || null;
 }
-function getMonsterById(id) {
-  return monsters.find(m => m.id === id) || null;
+async function getMonsterById(id) {
+   return monsters.find(m => m.id === id) || null;
+ }
+ function getMonstersByTier(tier) {
+   return monsters.filter(m => m.tier === tier);
+ }
+
+/* ======================
+Starter grant helpers
+====================== */
+
+async function hasAnyEquipment(userId) {
+  try {
+    const w = await Inventory.findOne({ where: { userId, itemType: 'weapon' } });
+    const g = await Inventory.findOne({ where: { userId, itemType: 'gear' } });
+    return !!(w || g);
+  } catch (err) {
+    console.error('hasAnyEquipment failed:', err);
+    return false;
+  }
+}
+
+/**
+ * Grant starter items (w0/g0) if the player has none.
+ * Optionally auto-equip the newly granted items.
+ */
+async function grantStarterIfNeeded(userId, { autoEquip = true } = {}) {
+  try {
+    if (!userId) return fail('userId required', 'InvalidInput');
+
+    const already = await hasAnyEquipment(userId);
+    if (already) return ok({ granted: false });
+
+    // Give starter weapon and gear
+    const wRes = await giveWeapon(userId, 'w0', 1);
+    const gRes = await giveGear(userId, 'g0', 1);
+
+    // Auto-equip if requested and inventory rows returned
+    let equipped = { weapon: null, gear: null };
+    if (autoEquip) {
+        if (wRes && wRes.success && wRes.data && wRes.data.inventory && wRes.data.inventory.id) {
+        await equipWeaponByInventoryId(userId, wRes.data.inventory.id);
+        equipped.weapon = wRes.data.inventory.id;
+      } else {
+        const wRow = await Inventory.findOne({ where: { userId, itemType: 'weapon', catalogId: 'w0' } });
+        if (wRow) {
+          await equipWeaponByInventoryId(userId, wRow.id);
+          equipped.weapon = wRow.id;
+        }
+      }
+
+      if (gRes && gRes.success && gRes.data && gRes.data.inventory && gRes.data.inventory.id) {
+        await equipGearByInventoryId(userId, gRes.data.inventory.id);
+        equipped.gear = gRes.data.inventory.id;
+      } else {
+        const gRow = await Inventory.findOne({ where: { userId, itemType: 'gear', catalogId: 'g0' } });
+        if (gRow) {
+          await equipGearByInventoryId(userId, gRow.id);
+          equipped.gear = gRow.id;
+        }
+      }
+    }
+
+    return ok({ granted: true, equipped });
+  } catch (err) {
+    console.error('grantStarterIfNeeded failed:', err);
+    return fail('Failed to grant starter items', 'Error');
+  }
 }
 
 /* ======================
-   Base helpers
-   ====================== */
-
+Base helpers
+====================== */
 async function ensurePlayer(userId, opts = {}) {
   try {
     if (!userId) return fail('userId required', 'InvalidInput');
     let player = await Player.findByPk(userId);
+    let created = false;
     if (!player) {
       player = await Player.create({
         userId,
         email: opts.email || null,
         displayName: opts.displayName || null
       });
+      created = true;
     }
+
+    // If we just created the player, ensure they receive starter items.
+    // Best-effort: do not fail player creation if starter grant fails.
+    if (created) {
+      try {
+        await grantStarterIfNeeded(userId, { autoEquip: true });
+      } catch (e) {
+        console.error('grantStarterIfNeeded error (non-fatal):', e);
+      }
+    }
+
     return ok({ player });
-  } catch (err) {
-    console.error('ensurePlayer failed:', err);
-    return fail('Failed to ensure player', 'Error');
-  }
-}
+   } catch (err) {
+     console.error('Failed to ensure player:', err);
+     return fail(err.message);
+   }
+ }
+ 
+ async function ensurePlayerOrThrow(userId, opts = {}) {
+   const res = await ensurePlayer(userId, opts);
+   if (!res.success) throw new Error(res.error || 'Failed to load player');
+   return res.data.player;
+ }
+
 
 /* ======================
    Account / Currency
@@ -854,7 +942,9 @@ module.exports = {
   gear,
   monsters,
 
-  // account
+  // player helpers
+  ensurePlayer,
+  ensurePlayerOrThrow,
   getBalance,
   addCurrency,
 
@@ -887,5 +977,9 @@ module.exports = {
   addServerAdmin,
   removeServerAdmin,
   listServerAdmins,
-  isServerAdmin
+  isServerAdmin,
+
+  // starter helpers
+  hasAnyEquipment,
+  grantStarterIfNeeded
 };
