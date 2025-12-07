@@ -148,15 +148,76 @@ const ServerAdmin = sequelize.define('ServerAdmin', {
    Catalogs
    ====================== */
 
-// NOTE: Replace the placeholder arrays below with your actual catalog entries.
+// weapons
 const weapons = [
-  /* { id: 'w1', name: 'Rusty Sword', tier: 1, attack: 5, gems: 0, rarity: 'common' }, ... */
+  { id: 'w1',  name: 'Rusty Sword',        tier: 1,  attack: 5,   gems: 0, rarity: 'common' },
+  { id: 'w2',  name: 'Wooden Club',        tier: 1,  attack: 6,   gems: 0, rarity: 'common' },
+  { id: 'w3',  name: 'Short Dagger',       tier: 2,  attack: 9,   gems: 0, rarity: 'common' },
+  { id: 'w4',  name: 'Hunting Spear',      tier: 2,  attack: 11,  gems: 0, rarity: 'uncommon' },
+  { id: 'w5',  name: 'Iron Blade',         tier: 3,  attack: 16,  gems: 0, rarity: 'uncommon' },
+  { id: 'w6',  name: 'War Hammer',         tier: 3,  attack: 18,  gems: 0, rarity: 'uncommon' },
+  { id: 'w7',  name: 'Steel Longsword',    tier: 4,  attack: 24,  gems: 1, rarity: 'rare' },
+  { id: 'w8',  name: 'Reinforced Axe',     tier: 4,  attack: 26,  gems: 1, rarity: 'rare' },
+  { id: 'w9',  name: 'Flanged Mace',       tier: 5,  attack: 33,  gems: 1, rarity: 'rare' },
+  { id: 'w10', name: 'Keen Rapier',        tier: 5,  attack: 35,  gems: 1, rarity: 'rare' },
+  { id: 'w11', name: 'Knight\'s Claymore', tier: 6,  attack: 44,  gems: 2, rarity: 'epic' },
+  { id: 'w12', name: 'Stormcaller Spear',  tier: 6,  attack: 46,  gems: 2, rarity: 'epic' },
+  { id: 'w13', name: 'Dragonfang Blade',   tier: 7,  attack: 58,  gems: 3, rarity: 'epic' },
+  { id: 'w14', name: 'Titan Maul',         tier: 7,  attack: 62,  gems: 3, rarity: 'epic' },
+  { id: 'w15', name: 'Void Edge',          tier: 8,  attack: 78,  gems: 4, rarity: 'legendary' },
+  { id: 'w16', name: 'Sunforged Halberd',  tier: 8,  attack: 82,  gems: 4, rarity: 'legendary' },
+  { id: 'w17', name: 'Abyssal Cleaver',    tier: 9,  attack: 100, gems: 6, rarity: 'mythic' },
+  { id: 'w18', name: 'Celestial Pike',     tier: 9,  attack: 104, gems: 6, rarity: 'mythic' },
+  { id: 'w19', name: 'Eternal Greatsword', tier: 10, attack: 130, gems: 8, rarity: 'ancient' },
+  { id: 'w20', name: 'Mythic Soulblade',   tier: 11, attack: 220, gems: 20, rarity: 'mystical' } // tier 11 (hidden)
 ];
+
+// gear
 const gear = [
-  /* { id: 'g1', name: 'Leather Armor', tier: 1, defense: 3, gems: 0, rarity: 'common' }, ... */
+  { id: 'g1',  name: 'Cloth Tunic',        tier: 1,  defense: 2,  gems: 0, rarity: 'common' },
+  { id: 'g2',  name: 'Leather Vest',       tier: 1,  defense: 3,  gems: 0, rarity: 'common' },
+  { id: 'g3',  name: 'Padded Jacket',      tier: 2,  defense: 6,  gems: 0, rarity: 'common' },
+  { id: 'g4',  name: 'Studded Leather',    tier: 2,  defense: 8,  gems: 0, rarity: 'uncommon' },
+  { id: 'g5',  name: 'Chain Shirt',        tier: 3,  defense: 12, gems: 0, rarity: 'uncommon' },
+  { id: 'g6',  name: 'Scale Mail',         tier: 3,  defense: 14, gems: 0, rarity: 'uncommon' },
+  { id: 'g7',  name: 'Brigandine',         tier: 4,  defense: 20, gems: 1, rarity: 'rare' },
+  { id: 'g8',  name: 'Iron Plate',         tier: 4,  defense: 22, gems: 1, rarity: 'rare' },
+  { id: 'g9',  name: 'Knight\'s Guard',    tier: 5,  defense: 30, gems: 1, rarity: 'rare' },
+  { id: 'g10', name: 'Guardian Mail',      tier: 5,  defense: 32, gems: 1, rarity: 'rare' },
+  { id: 'g11', name: 'Tempered Cuirass',   tier: 6,  defense: 40, gems: 2, rarity: 'epic' },
+  { id: 'g12', name: 'Aegis Plate',        tier: 6,  defense: 42, gems: 2, rarity: 'epic' },
+  { id: 'g13', name: 'Dragonhide Armor',   tier: 7,  defense: 54, gems: 3, rarity: 'epic' },
+  { id: 'g14', name: 'Stormguard Vest',    tier: 7,  defense: 56, gems: 3, rarity: 'epic' },
+  { id: 'g15', name: 'Celestial Mail',     tier: 8,  defense: 70, gems: 4, rarity: 'legendary' },
+  { id: 'g16', name: 'Sunplate Armor',     tier: 8,  defense: 74, gems: 4, rarity: 'legendary' },
+  { id: 'g17', name: 'Abyssal Shroud',     tier: 9,  defense: 92, gems: 6, rarity: 'mythic' },
+  { id: 'g18', name: 'Eternal Breastplate',tier: 9,  defense: 96, gems: 6, rarity: 'mythic' },
+  { id: 'g19', name: 'Worldbreaker Armor', tier: 10, defense: 120,gems: 8, rarity: 'ancient' },
+  { id: 'g20', name: 'Mystic Wardrobe',    tier: 11, defense: 200,gems: 20, rarity: 'mystical' } // tier 11 (hidden)
 ];
+
+// monsters
 const monsters = [
-  /* { id: 'm1', name: 'Rat', tier: 1, threshold: 0, gems: 1 }, ... */
+  { id: 'm1',  name: 'Rat',              tier: 1,  threshold: 15,   gems: 1 },
+  { id: 'm2',  name: 'Wild Boar',        tier: 1,  threshold: 15,   gems: 1 },
+  { id: 'm3',  name: 'Giant Spider',     tier: 2,  threshold: 40,   gems: 1 },
+  { id: 'm4',  name: 'Forest Wolf',      tier: 2,  threshold: 40,   gems: 1 },
+  { id: 'm5',  name: 'Bandit',           tier: 3,  threshold: 75,   gems: 3 },
+  { id: 'm6',  name: 'Ogre Brute',       tier: 3,  threshold: 75,   gems: 3 },
+  { id: 'm7',  name: 'Stone Golem',      tier: 4,  threshold: 120,  gems: 4 },
+  { id: 'm8',  name: 'Warg Rider',       tier: 4,  threshold: 120,  gems: 4 },
+  { id: 'm9',  name: 'Harpy',            tier: 5,  threshold: 175,  gems: 6 },
+  { id: 'm10', name: 'Troll',            tier: 5,  threshold: 175,  gems: 6 },
+  { id: 'm11', name: 'Wyvern',           tier: 6,  threshold: 240,  gems: 8 },
+  { id: 'm12', name: 'Ironclad Knight',  tier: 6,  threshold: 240,  gems: 8 },
+  { id: 'm13', name: 'Basilisk',         tier: 7,  threshold: 315,  gems: 11 },
+  { id: 'm14', name: 'Fire Drake',       tier: 7,  threshold: 315,  gems: 11 },
+  { id: 'm15', name: 'Storm Elemental',  tier: 8,  threshold: 400,  gems: 13 },
+  { id: 'm16', name: 'Titan Warden',     tier: 8,  threshold: 400,  gems: 13 },
+  { id: 'm17', name: 'Leviathan Spawn',  tier: 9,  threshold: 495,  gems: 17 },
+  { id: 'm18', name: 'Void Reaver',      tier: 9,  threshold: 495,  gems: 17 },
+  { id: 'm19', name: 'Ancient Colossus', tier:10,  threshold: 600,  gems: 20 },
+  { id: 'm20', name: 'Mythic Seraph',    tier:11,  threshold: 715,  gems: 24 } // tier 11 mystical (very hard)
 ];
 
 /* ======================
@@ -895,6 +956,27 @@ async function adminGrantItem(targetUserId, catalogId, type, qty = 1) {
   }
 }
 
+/**
+ * Initialize DB (sync models) and refresh caches.
+ * Call this from main.js at startup.
+ */
+async function initDb({ force = false } = {}) {
+  try {
+    // sync models (non-destructive by default)
+    await sequelize.sync({ alter: true, force: !!force });
+    // refresh monster index cache if applicable
+    try {
+      refreshMonsterIndex();
+    } catch (e) {
+      // ignore
+    }
+    return ok({ initialized: true });
+  } catch (err) {
+    console.error('initDb failed:', err);
+    return fail(err.message || 'initDb error');
+  }
+}
+
 /* ======================
    Exports
    ====================== */
@@ -968,5 +1050,8 @@ module.exports = {
 
   // helpers
   ok,
-  fail
+  fail,
+  
+  // initialization
+  initDb
 };

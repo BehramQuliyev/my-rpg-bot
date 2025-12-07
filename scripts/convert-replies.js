@@ -18,27 +18,56 @@ function parseCode(src) {
 }
 
 function ensureReplyFromResultImport(ast) {
-  let hasImport = false;
+  // If any import already brings replyFromResult, do nothing
+  let hasSpecifier = false;
   traverse(ast, {
     ImportDeclaration(path) {
-      if (path.node.source.value === '../../utils/reply' || path.node.source.value.endsWith('/utils/reply')) {
-        const specifiers = path.node.specifiers.map(s => s.local.name);
-        if (!specifiers.includes('replyFromResult')) {
-          path.node.specifiers.push(t.importSpecifier(t.identifier('replyFromResult'), t.identifier('replyFromResult')));
+      try {
+        const src = path.node.source && path.node.source.value;
+        if (src && (src === '../../utils/reply' || src.endsWith('/utils/reply'))) {
+          const specifiers = path.node.specifiers.map(s => s.local && s.local.name).filter(Boolean);
+          if (specifiers.includes('replyFromResult')) {
+            hasSpecifier = true;
+            path.stop();
+          } else {
+            // add specifier to existing import if not present
+            path.node.specifiers.push(t.importSpecifier(t.identifier('replyFromResult'), t.identifier('replyFromResult')));
+            hasSpecifier = true;
+            path.stop();
+          }
         }
-        hasImport = true;
+      } catch (e) {
+        // ignore and continue
       }
     }
   });
-  // If no import from utils/reply found, add one at top
-  if (!hasImport) {
-    const imp = t.importDeclaration(
-      [t.importSpecifier(t.identifier('replyFromResult'), t.identifier('replyFromResult'))],
-      t.stringLiteral('../../utils/reply')
-    );
-    ast.program.body.unshift(imp);
-  }
+
+  if (hasSpecifier) return;
+
+  // If any top-level identifier named replyFromResult exists (var/const/function), do not add import
+  let identifierExists = false;
+  traverse(ast, {
+    Identifier(path) {
+      if (path.node.name === 'replyFromResult') {
+        // ensure it's a top-level declaration (avoid matching local param names)
+        const parent = path.findParent(p => p.isProgram());
+        if (parent) {
+          identifierExists = true;
+          path.stop();
+        }
+      }
+    }
+  });
+  if (identifierExists) return;
+
+  // Otherwise add a new import at top
+  const imp = t.importDeclaration(
+    [t.importSpecifier(t.identifier('replyFromResult'), t.identifier('replyFromResult'))],
+    t.stringLiteral('../../utils/reply')
+  );
+  ast.program.body.unshift(imp);
 }
+
 
 function transformCalls(ast, report) {
   traverse(ast, {

@@ -50,9 +50,9 @@ Note: Tier 11 Mystical items are hidden for compact display.
 };
 
 async function sendWeaponCatalogPaginated(message, context) {
-  const filtered = (Array.isArray(weapons) ? weapons : []).filter((w) => w.tier !== 11);
+  const filtered = (Array.isArray(weapons) ? weapons : []).filter(w => w.tier !== 11);
   const byTier = {};
-  filtered.forEach((w) => {
+  filtered.forEach(w => {
     byTier[w.tier] = byTier[w.tier] || [];
     byTier[w.tier].push(w);
   });
@@ -65,7 +65,7 @@ async function sendWeaponCatalogPaginated(message, context) {
     let description = `⚔️ **Weapons** — ${filtered.length} items\n\n`;
     for (const tier of pageTiers) {
       description += `**🔰 Tier ${tier}**\n`;
-      byTier[tier].forEach((w) => {
+      byTier[tier].forEach(w => {
         description += `• **${w.name}** ⚔️ — _${w.rarity}_ • ATK: **${w.attack}**\n`;
       });
       description += '\n';
@@ -92,9 +92,9 @@ async function sendWeaponCatalogPaginated(message, context) {
 }
 
 async function sendGearCatalogPaginated(message, context) {
-  const filtered = (Array.isArray(gear) ? gear : []).filter((g) => g.tier !== 11);
+  const filtered = (Array.isArray(gear) ? gear : []).filter(g => g.tier !== 11);
   const byTier = {};
-  filtered.forEach((g) => {
+  filtered.forEach(g => {
     byTier[g.tier] = byTier[g.tier] || [];
     byTier[g.tier].push(g);
   });
@@ -107,7 +107,7 @@ async function sendGearCatalogPaginated(message, context) {
     let description = `🛡️ **Gear** — ${filtered.length} items\n\n`;
     for (const tier of pageTiers) {
       description += `**🔰 Tier ${tier}**\n`;
-      byTier[tier].forEach((g) => {
+      byTier[tier].forEach(g => {
         description += `• **${g.name}** 🛡️ — _${g.rarity}_ • DEF: **${g.defense}**\n`;
       });
       description += '\n';
@@ -134,12 +134,12 @@ async function sendGearCatalogPaginated(message, context) {
 }
 
 async function sendMonsterCatalog(message) {
-  const filtered = (Array.isArray(monsters) ? monsters : []).filter((m) => m.tier !== 11);
+  const filtered = (Array.isArray(monsters) ? monsters : []).filter(m => m.tier !== 11);
   const sorted = [...filtered].sort((a, b) => a.tier - b.tier || a.threshold - b.threshold);
 
   let description = `👹 **Monsters** — ${sorted.length} creatures\n\n`;
   let currentTier = null;
-  sorted.forEach((m) => {
+  sorted.forEach(m => {
     if (m.tier !== currentTier) {
       description += `**🔰 Tier ${m.tier}**\n`;
       currentTier = m.tier;
@@ -169,19 +169,19 @@ async function sendPaginatedEmbed(message, title, pages, currentPage) {
 
   if (currentPage > 0) {
     row.addComponents(
-      new ButtonBuilder().
-      setCustomId(`catalog_prev_${currentPage - 1}`).
-      setLabel('← Previous').
-      setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setCustomId(`catalog_prev_${currentPage - 1}`)
+        .setLabel('← Previous')
+        .setStyle(ButtonStyle.Primary)
     );
   }
 
   if (currentPage < pages.length - 1) {
     row.addComponents(
-      new ButtonBuilder().
-      setCustomId(`catalog_next_${currentPage + 1}`).
-      setLabel('Next →').
-      setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setCustomId(`catalog_next_${currentPage + 1}`)
+        .setLabel('Next →')
+        .setStyle(ButtonStyle.Primary)
     );
   }
 

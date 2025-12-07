@@ -179,9 +179,8 @@ client.on('messageCreate', async (message) => {
       // Execute the command
       const result = await command.execute(message, args, ctx);
 
-      // If the command returns a unified result and hasn't replied, we can optionally handle here.
+      // If the command returned a unified result, main.js handles the reply
       if (!replied && result && typeof result === 'object' && 'success' in result) {
-        // Lazy import to avoid cyclic deps in tests
         const { replyFromResult } = require('./commands/utils/reply');
         await replyFromResult(message, result, {
           label: `/${command.name}`,
@@ -191,6 +190,8 @@ client.on('messageCreate', async (message) => {
         });
         replied = true;
       }
+
+
 
       console.log(`< Command executed OK: ${command.name} for ${message.author.tag}`);
     } catch (cmdErr) {

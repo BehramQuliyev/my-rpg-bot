@@ -1,10 +1,13 @@
 'use strict';
 
 const { EmbedBuilder } = require('discord.js');
-const { THEME } = require('../../config');
-const { replySuccess } = require('../utils/reply');
 
-await replySuccess(message, 'All good!', 'Success', THEME);
+/**
+ * reply.js
+ * Lightweight reply helpers for commands.
+ * - No top-level await or async initialization
+ * - Exports: replyEmbed, replySuccess, replyError, replyInfo, replyFromResult, buildEmbed, DEFAULT_THEME, formatResultMessage, formatDuration
+ */
 
 /**
  * Default theme values. These can be overridden by passing a `theme` object.
@@ -148,7 +151,9 @@ function formatCooldownMessage(actionLabel, remainingSeconds) {
  */
 function formatResultMessage(res, context = {}) {
   const label = context.label || 'Action';
-  if (res.success) return `${label} succeeded.`;
+  if (res && res.success) return `${label} succeeded.`;
+
+  if (!res) return 'Something went wrong.';
 
   switch (res.reason) {
     case 'Cooldown':
@@ -167,13 +172,12 @@ function formatResultMessage(res, context = {}) {
       return 'No finished work session to collect.';
     case 'MissingEquipment':
       return 'Equip 1 weapon and 1 gear before hunting.';
-    case 'ThresholdNotMet':
-      {
-        const power = res?.data?.power ?? 0;
-        const monsterName = res?.data?.monster?.name || 'target';
-        const threshold = res?.data?.monster?.threshold ?? 0;
-        return `Power too low for ${monsterName}.\nYour power: ${power} | Required: ${threshold}.`;
-      }
+    case 'ThresholdNotMet': {
+      const power = res?.data?.power ?? 0;
+      const monsterName = res?.data?.monster?.name || 'target';
+      const threshold = res?.data?.monster?.threshold ?? 0;
+      return `Power too low for ${monsterName}.\nYour power: ${power} | Required: ${threshold}.`;
+    }
     case 'InvalidInput':
       return 'Invalid input provided.';
     case 'InvalidCurrencyType':
@@ -194,14 +198,26 @@ function formatResultMessage(res, context = {}) {
  * Reply using the unified result from storage.js.
  * Automatically picks success/info/error styling.
  */
-async function replyFromResult(message, res, { successTitle = 'Success', infoTitle = 'Info', errorTitle = 'Error', theme = {}, label = 'Action', successDescription } = {}) {
+async function replyFromResult(
+  message,
+  res,
+  {
+    successTitle = 'Success',
+    infoTitle = 'Info',
+    errorTitle = 'Error',
+    theme = {},
+    label = 'Action',
+    successDescription
+  } = {}
+) {
   const COLORS = theme.COLORS ? { ...DEFAULT_THEME.COLORS, ...theme.COLORS } : DEFAULT_THEME.COLORS;
   const EMOJIS = theme.EMOJIS ? { ...DEFAULT_THEME.EMOJIS, ...theme.EMOJIS } : DEFAULT_THEME.EMOJIS;
 
-  if (res.success) {
-    const description = typeof successDescription === 'function'
-      ? successDescription(res.data)
-      : (successDescription || formatResultMessage(res, { label }));
+  if (res && res.success) {
+    const description =
+      typeof successDescription === 'function'
+        ? successDescription(res.data)
+        : successDescription || formatResultMessage(res, { label });
     const embed = buildEmbed({
       title: `${EMOJIS.SUCCESS} ${successTitle}`,
       description,
@@ -212,10 +228,11 @@ async function replyFromResult(message, res, { successTitle = 'Success', infoTit
   }
 
   const description = formatResultMessage(res, { label });
+  const isInfoReason = res && (res.reason === 'Cooldown' || res.reason === 'StillWorking' || res.reason === 'AlreadyCollected');
   const embed = buildEmbed({
-    title: `${res.reason === 'Cooldown' || res.reason === 'StillWorking' || res.reason === 'AlreadyCollected' ? EMOJIS.INFO : EMOJIS.ERROR} ${res.reason === 'Cooldown' ? infoTitle : errorTitle}`,
+    title: `${isInfoReason ? EMOJIS.INFO : EMOJIS.ERROR} ${isInfoReason ? infoTitle : errorTitle}`,
     description,
-    color: res.reason === 'Cooldown' || res.reason === 'StillWorking' || res.reason === 'AlreadyCollected' ? COLORS.INFO : COLORS.ERROR,
+    color: isInfoReason ? COLORS.INFO : COLORS.ERROR,
     theme
   });
   return safeSendEmbed(message, embed);

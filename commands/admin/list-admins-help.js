@@ -1,4 +1,4 @@
-'use strict';import { replyFromResult } from "../../utils/reply";
+'use strict';
 
 const { buildEmbed, DEFAULT_THEME, replyFromResult } = require('../../utils/reply');
 
