@@ -5,6 +5,21 @@ const { Client, GatewayIntentBits, Collection, ButtonBuilder, ActionRowBuilder, 
 const fs = require('fs');
 const path = require('path');
 
+console.log('Starting bot, NODE_ENV=', process.env.NODE_ENV);
+console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
+console.log('DISCORD_TOKEN present:', !!process.env.DISCORD_TOKEN);
+
+process.on('uncaughtException', err => {
+  console.error('uncaughtException:', err);
+});
+process.on('unhandledRejection', err => {
+  console.error('unhandledRejection:', err);
+});
+
+storage.sequelize.authenticate()
+  .then(() => console.log('Database connected'))
+  .catch(err => console.error('Database connection failed:', err));
+
 // Validate environment early
 const { validateEnv } = require('./env-validate');
 const envCheck = validateEnv();
@@ -275,3 +290,17 @@ client.on('interactionCreate', async (interaction) => {
     console.error('Catalog button interaction error:', err?.stack || err);
   }
 });
+
+// Hook shutdown handlers before login
+setupClientShutdown();
+
+// Attempt login and log any failure
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => {
+    console.log('client.login resolved (login attempt finished)');
+  })
+  .catch(err => {
+    console.error('Discord client failed to login:', err);
+    // keep process alive briefly so PM2 logs show the error, then exit if needed
+    setTimeout(() => process.exit(1), 2000);
+  });
