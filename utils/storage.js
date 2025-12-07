@@ -1,24 +1,31 @@
 'use strict';
 
 /**
- * storage.js
- * Complete, self-contained storage utilities for the RPG bot.
- * - Sequelize models
- * - Catalogs (weapons, gear, monsters)
- * - Helpers for players, inventory, daily, work, hunt, admin
+ * utils/storage.js
+ *
+ * Sequelize-backed storage adapter for my-rpg-bot.
  * - Unified return shape: { success, data, error, reason }
+ * - Exports functions used by commands and catalogs arrays (weapons, gear, monsters)
+ *
+ * NOTE: Adjust connection options and model definitions to match your production DB.
  */
 
 const { Sequelize, DataTypes, Op } = require('sequelize');
 require('dotenv').config();
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
-  dialect: 'postgres',
-  logging: false
+const DATABASE_URL = process.env.DATABASE_URL || null;
+if (!DATABASE_URL) {
+  console.warn('No DATABASE_URL provided; storage will attempt to connect with default sqlite in-memory for local dev.');
+}
+
+const sequelize = new Sequelize(DATABASE_URL || 'sqlite::memory:', {
+  dialect: DATABASE_URL ? 'postgres' : 'sqlite',
+  logging: false,
+  dialectOptions: DATABASE_URL && DATABASE_URL.startsWith('postgres') ? {} : undefined
 });
 
 /* ======================
-   Configuration constants
+   Constants
    ====================== */
 
 const DAILY_BASE_BRONZE = 50;
@@ -42,7 +49,7 @@ const DEFAULT_HUNT_COOLDOWN_SECONDS = 60;
 function ok(data = {}) {
   return { success: true, data, error: null, reason: null };
 }
-function fail(error, reason = null, data = null) {
+function fail(error = 'Error', reason = 'Error', data = null) {
   return { success: false, data, error: String(error), reason };
 }
 
@@ -64,7 +71,7 @@ const Player = sequelize.define('Player', {
   workStreak: { type: DataTypes.INTEGER, defaultValue: 0 },
   lastWorkCollectedAt: { type: DataTypes.DATE, allowNull: true }
 }, {
-  indexes: [{ fields: ['email'] }, { fields: ['displayName'] }],
+  indexes: [{ fields: ['displayName'] }],
   timestamps: true
 });
 
@@ -82,48 +89,10 @@ const Inventory = sequelize.define('Inventory', {
   indexes: [
     { unique: true, fields: ['userId', 'catalogId', 'itemType'] },
     { fields: ['userId'] },
-    { fields: ['itemType'] },
-    { fields: ['catalogId'] }
+    { fields: ['itemType'] }
   ],
   timestamps: true
 });
-
-const HuntRecord = sequelize.define('HuntRecord', {
-  userId: { type: DataTypes.STRING },
-  monsterTier: { type: DataTypes.INTEGER },
-  kills: { type: DataTypes.INTEGER, defaultValue: 0 }
-}, {
-  indexes: [
-    { unique: true, fields: ['userId', 'monsterTier'] },
-    { fields: ['userId'] },
-    { fields: ['monsterTier'] }
-  ],
-  timestamps: true
-});
-
-const HuntCooldown = sequelize.define('HuntCooldown', {
-  userId: { type: DataTypes.STRING },
-  monsterTier: { type: DataTypes.INTEGER },
-  lastHuntAt: { type: DataTypes.DATE }
-}, {
-  indexes: [{ fields: ['userId'] }, { fields: ['monsterTier'] }],
-  timestamps: true
-});
-
-const Auction = sequelize.define('Auction', {
-  auctionId: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-  sellerId: { type: DataTypes.STRING },
-  itemName: { type: DataTypes.STRING },
-  startingBid: { type: DataTypes.INTEGER },
-  highestBid: { type: DataTypes.INTEGER, defaultValue: 0 },
-  highestBidder: { type: DataTypes.STRING, allowNull: true }
-}, { timestamps: true });
-
-const DailyClaim = sequelize.define('DailyClaim', {
-  userId: { type: DataTypes.STRING, primaryKey: true },
-  lastClaimAt: { type: DataTypes.DATE, allowNull: true },
-  streak: { type: DataTypes.INTEGER, defaultValue: 0 }
-}, { indexes: [{ fields: ['userId'] }], timestamps: true });
 
 const WorkSession = sequelize.define('WorkSession', {
   userId: { type: DataTypes.STRING },
@@ -133,24 +102,40 @@ const WorkSession = sequelize.define('WorkSession', {
   status: { type: DataTypes.STRING, defaultValue: 'working' } // working | finished | collected | cancelled
 }, { indexes: [{ fields: ['userId'] }], timestamps: true });
 
+const DailyClaim = sequelize.define('DailyClaim', {
+  userId: { type: DataTypes.STRING, primaryKey: true },
+  lastClaimAt: { type: DataTypes.DATE, allowNull: true },
+  streak: { type: DataTypes.INTEGER, defaultValue: 0 }
+}, { timestamps: true });
+
+const HuntRecord = sequelize.define('HuntRecord', {
+  userId: { type: DataTypes.STRING },
+  monsterTier: { type: DataTypes.INTEGER },
+  kills: { type: DataTypes.INTEGER, defaultValue: 0 }
+}, { timestamps: true });
+
+const HuntCooldown = sequelize.define('HuntCooldown', {
+  userId: { type: DataTypes.STRING },
+  monsterTier: { type: DataTypes.INTEGER },
+  lastHuntAt: { type: DataTypes.DATE }
+}, { timestamps: true });
+
 const ServerAdmin = sequelize.define('ServerAdmin', {
   serverId: { type: DataTypes.STRING, allowNull: false },
   userId: { type: DataTypes.STRING, allowNull: false },
   role: { type: DataTypes.STRING, allowNull: false, defaultValue: 'admin' }
 }, {
   indexes: [
-    { fields: ['serverId'] },
-    { fields: ['userId'] },
-    { unique: true, fields: ['serverId', 'userId'] }
+    { unique: true, fields: ['serverId', 'userId'] },
+    { fields: ['serverId'] }
   ],
   timestamps: true
 });
 
 /* ======================
-   Catalogs
+   Catalogs (exported)
    ====================== */
 
-// weapons
 const weapons = [
   { id: 'w1',  name: 'Rusty Sword',        tier: 1,  attack: 5,   gems: 0, rarity: 'common' },
   { id: 'w2',  name: 'Wooden Club',        tier: 1,  attack: 6,   gems: 0, rarity: 'common' },
@@ -171,10 +156,9 @@ const weapons = [
   { id: 'w17', name: 'Abyssal Cleaver',    tier: 9,  attack: 100, gems: 6, rarity: 'mythic' },
   { id: 'w18', name: 'Celestial Pike',     tier: 9,  attack: 104, gems: 6, rarity: 'mythic' },
   { id: 'w19', name: 'Eternal Greatsword', tier: 10, attack: 130, gems: 8, rarity: 'ancient' },
-  { id: 'w20', name: 'Mythic Soulblade',   tier: 11, attack: 220, gems: 20, rarity: 'mystical' } // tier 11 (hidden)
+  { id: 'w20', name: 'Mythic Soulblade',   tier: 11, attack: 220, gems: 20, rarity: 'mystical' } // hidden
 ];
 
-// gear
 const gear = [
   { id: 'g1',  name: 'Cloth Tunic',        tier: 1,  defense: 2,  gems: 0, rarity: 'common' },
   { id: 'g2',  name: 'Leather Vest',       tier: 1,  defense: 3,  gems: 0, rarity: 'common' },
@@ -195,10 +179,9 @@ const gear = [
   { id: 'g17', name: 'Abyssal Shroud',     tier: 9,  defense: 92, gems: 6, rarity: 'mythic' },
   { id: 'g18', name: 'Eternal Breastplate',tier: 9,  defense: 96, gems: 6, rarity: 'mythic' },
   { id: 'g19', name: 'Worldbreaker Armor', tier: 10, defense: 120,gems: 8, rarity: 'ancient' },
-  { id: 'g20', name: 'Mystic Wardrobe',    tier: 11, defense: 200,gems: 20, rarity: 'mystical' } // tier 11 (hidden)
+  { id: 'g20', name: 'Mystic Wardrobe',    tier: 11, defense: 200,gems: 20, rarity: 'mystical' } // hidden
 ];
 
-// monsters
 const monsters = [
   { id: 'm1',  name: 'Rat',              tier: 1,  threshold: 15,   gems: 1 },
   { id: 'm2',  name: 'Wild Boar',        tier: 1,  threshold: 15,   gems: 1 },
@@ -219,7 +202,7 @@ const monsters = [
   { id: 'm17', name: 'Leviathan Spawn',  tier: 9,  threshold: 495,  gems: 17 },
   { id: 'm18', name: 'Void Reaver',      tier: 9,  threshold: 495,  gems: 17 },
   { id: 'm19', name: 'Ancient Colossus', tier:10,  threshold: 600,  gems: 20 },
-  { id: 'm20', name: 'Mythic Seraph',    tier:11,  threshold: 715,  gems: 24 } // tier 11 mystical (very hard)
+  { id: 'm20', name: 'Mythic Seraph',    tier:11,  threshold: 715,  gems: 24 } // hidden
 ];
 
 /* ======================
@@ -234,92 +217,6 @@ function getGearById(id) {
 }
 function getMonsterById(id) {
   return monsters.find(m => m.id === id) || null;
-}
-function getMonstersByTier(tier) {
-  return monsters.filter(m => m.tier === tier);
-}
-
-/* ======================
-   Tier index helpers
-   ====================== */
-
-function buildTierIndex(monstersList = []) {
-  try {
-    if (!Array.isArray(monstersList) || monstersList.length === 0) {
-      return ok({ index: { tiers: [], tiersMap: {}, minThresholdByTier: {} } });
-    }
-    const tiersMap = {};
-    for (const m of monstersList) {
-      const t = Number(m.tier) || 0;
-      tiersMap[t] = tiersMap[t] || [];
-      tiersMap[t].push(m);
-    }
-    const tiers = Object.keys(tiersMap).map(Number).filter(n => !Number.isNaN(n)).sort((a, b) => a - b);
-    const minThresholdByTier = {};
-    for (const t of tiers) {
-      const arr = tiersMap[t];
-      const thresholds = arr.map(x => Number(x.threshold) || 0);
-      minThresholdByTier[t] = thresholds.length ? Math.min(...thresholds) : 0;
-    }
-    return ok({ index: { tiers, tiersMap, minThresholdByTier } });
-  } catch (err) {
-    console.error('buildTierIndex failed:', err);
-    return fail(err.message || 'Index build failed');
-  }
-}
-
-let _monsterIndexCache = null;
-function refreshMonsterIndex(monstersList = monsters) {
-  const res = buildTierIndex(monstersList);
-  if (res.success) {
-    _monsterIndexCache = res.data.index;
-    return ok({ index: _monsterIndexCache });
-  }
-  return res;
-}
-
-function getBestTier(power, monstersList = monsters, index = null) {
-  try {
-    const p = Number(power) || 0;
-    const list = Array.isArray(monstersList) ? monstersList : [];
-    if ((!index || Object.keys(index).length === 0) && _monsterIndexCache) index = _monsterIndexCache;
-    const idx = index || buildTierIndex(list).data.index;
-    if (!idx || !Array.isArray(idx.tiers) || idx.tiers.length === 0) return ok({ tier: 0, monsters: [] });
-    let best = 0;
-    for (const t of idx.tiers) {
-      const minThreshold = Number(idx.minThresholdByTier[t] || 0);
-      if (p >= minThreshold) best = t;
-      else break;
-    }
-    const resultMonsters = Array.isArray(idx.tiersMap[best]) ? [...idx.tiersMap[best]] : [];
-    resultMonsters.sort((a, b) => (Number(a.threshold) - Number(b.threshold)) || (a.id - b.id));
-    return ok({ tier: best, monsters: resultMonsters });
-  } catch (err) {
-    console.error('getBestTier failed:', err);
-    return fail(err.message || 'getBestTier error');
-  }
-}
-
-function getEligibleMonsters(power, monstersList = monsters, index = null) {
-  try {
-    const p = Number(power) || 0;
-    const list = Array.isArray(monstersList) ? monstersList : [];
-    if ((!index || Object.keys(index).length === 0) && _monsterIndexCache) index = _monsterIndexCache;
-    const idx = index || buildTierIndex(list).data.index;
-    if (!idx || !Array.isArray(idx.tiers) || idx.tiers.length === 0) return ok({ eligible: {} });
-    const out = {};
-    for (const t of idx.tiers) {
-      const arr = (idx.tiersMap[t] || []).filter(m => (Number(m.threshold) || 0) <= p);
-      if (arr.length > 0) {
-        arr.sort((a, b) => (Number(a.threshold) - Number(b.threshold)) || (a.id - b.id));
-        out[t] = arr;
-      }
-    }
-    return ok({ eligible: out });
-  } catch (err) {
-    console.error('getEligibleMonsters failed:', err);
-    return fail(err.message || 'getEligibleMonsters error');
-  }
 }
 
 /* ======================
@@ -339,16 +236,14 @@ async function ensurePlayer(userId, opts = {}) {
     }
     return ok({ player });
   } catch (err) {
-    console.error('Failed to ensure player:', err);
-    return fail(err.message);
+    console.error('ensurePlayer failed:', err);
+    return fail('Failed to ensure player', 'Error');
   }
 }
 
-async function ensurePlayerOrThrow(userId, opts = {}) {
-  const res = await ensurePlayer(userId, opts);
-  if (!res.success) throw new Error(res.error || 'Failed to load player');
-  return res.data.player;
-}
+/* ======================
+   Account / Currency
+   ====================== */
 
 async function getBalance(userId) {
   try {
@@ -357,8 +252,8 @@ async function getBalance(userId) {
     const p = res.data.player;
     return ok({ balance: { bronze: p.bronze, silver: p.silver, gold: p.gold, gems: p.gems } });
   } catch (err) {
-    console.error('Failed to get balance:', err);
-    return fail(err.message);
+    console.error('getBalance failed:', err);
+    return fail('Failed to get balance', 'Error');
   }
 }
 
@@ -367,220 +262,218 @@ async function addCurrency(userId, type, amount) {
     const res = await ensurePlayer(userId);
     if (!res.success) return res;
     const player = res.data.player;
-    if (player[type] !== undefined) {
-      player[type] += amount;
-      await player.save();
-      return ok({ newValue: player[type] });
-    }
-    return fail('Invalid currency type', 'InvalidCurrencyType');
+    if (player[type] === undefined) return fail('Invalid currency type', 'InvalidCurrencyType');
+    player[type] = Math.max(0, (player[type] || 0) + Number(amount || 0));
+    await player.save();
+    return ok({ newValue: player[type] });
   } catch (err) {
-    console.error('Failed to add currency:', err);
-    return fail(err.message);
+    console.error('addCurrency failed:', err);
+    return fail('Failed to add currency', 'Error');
   }
 }
 
 /* ======================
-   Admin helpers
+   Daily
    ====================== */
 
-// Admin: adjust a player's currency (safe, transactional)
-async function adminAdjustCurrency(adminUserId, targetUserId, deltas = {}) {
+async function claimDaily(userId) {
   try {
-    if (!adminUserId) return fail('Invalid admin user', 'InvalidUser');
-    if (!targetUserId) return fail('Invalid target user', 'InvalidInput');
+    if (!userId) return fail('Invalid user', 'InvalidUser');
 
-    const allowed = ['bronze', 'silver', 'gold', 'gems'];
-    const keys = Object.keys(deltas || {});
-    if (keys.length === 0) return fail('No currency deltas provided', 'InvalidInput');
-
-    for (const k of keys) {
-      if (!allowed.includes(k)) return fail(`Invalid currency type: ${k}`, 'InvalidCurrencyType');
-      if (typeof deltas[k] !== 'number' || !Number.isFinite(deltas[k])) {
-        return fail(`Invalid delta for ${k}`, 'InvalidInput');
-      }
-    }
+    const now = new Date();
 
     const res = await sequelize.transaction(async (t) => {
-      let player = await Player.findByPk(targetUserId, { transaction: t, lock: t.LOCK.UPDATE });
+      let claim = await DailyClaim.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!claim) {
+        claim = await DailyClaim.create({ userId, lastClaimAt: null, streak: 0 }, { transaction: t });
+      }
+
+      const last = claim.lastClaimAt ? new Date(claim.lastClaimAt) : null;
+      if (last) {
+        const secondsSince = Math.floor((now.getTime() - last.getTime()) / 1000);
+        if (secondsSince < DAILY_COOLDOWN_SECONDS) {
+          const remaining = DAILY_COOLDOWN_SECONDS - secondsSince;
+          return fail('Daily on cooldown', 'Cooldown', { remaining });
+        }
+      }
+
+      // compute streak
+      let streak = 1;
+      if (claim.lastClaimAt) {
+        const secondsSince = Math.floor((now.getTime() - new Date(claim.lastClaimAt).getTime()) / 1000);
+        if (secondsSince <= DAILY_STREAK_WINDOW_SECONDS) {
+          streak = Math.min((claim.streak || 0) + 1, 365);
+        }
+      }
+
+      const reward = DAILY_BASE_BRONZE + (Math.max(0, streak - 1) * DAILY_STREAK_BONUS);
+
+      // ensure player and add currency
+      let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
       if (!player) {
-        player = await Player.create({ userId: targetUserId }, { transaction: t });
+        player = await Player.create({ userId }, { transaction: t });
       }
-
-      for (const k of keys) {
-        const delta = Number(deltas[k]) || 0;
-        player[k] = Math.max(0, (player[k] || 0) + delta);
-      }
-
+      player.bronze = (player.bronze || 0) + reward;
       await player.save({ transaction: t });
 
-      return {
-        userId: player.userId,
-        balance: { bronze: player.bronze, silver: player.silver, gold: player.gold, gems: player.gems }
-      };
+      claim.lastClaimAt = now;
+      claim.streak = streak;
+      await claim.save({ transaction: t });
+
+      return ok({ reward, streak, nextAvailableAt: Math.floor((now.getTime() + DAILY_COOLDOWN_SECONDS * 1000) / 1000) });
     });
 
-    return ok(res);
+    return res;
   } catch (err) {
-    console.error('adminAdjustCurrency failed:', err);
-    return fail(err.message || 'adminAdjustCurrency error', 'Error');
-  }
-}
-
-// Admin: grant an item (weapon or gear) to a user
-async function adminGrantItem(adminUserId, targetUserId, itemType, catalogId, qty = 1) {
-  try {
-    if (!adminUserId) return fail('Invalid admin user', 'InvalidUser');
-    if (!targetUserId) return fail('Invalid target user', 'InvalidInput');
-    if (!itemType || !['weapon', 'gear'].includes(itemType)) return fail('Invalid itemType', 'InvalidInput');
-    if (!catalogId) return fail('catalogId required', 'InvalidInput');
-    qty = Number(qty) || 1;
-    if (qty <= 0) return fail('qty must be positive', 'InvalidInput');
-
-    if (itemType === 'weapon') {
-      return await giveWeapon(targetUserId, catalogId, qty);
-    } else {
-      return await giveGear(targetUserId, catalogId, qty);
-    }
-  } catch (err) {
-    console.error('adminGrantItem failed:', err);
-    return fail(err.message || 'adminGrantItem error', 'Error');
+    console.error('claimDaily failed:', err);
+    return fail('Failed to claim daily', 'Error');
   }
 }
 
 /* ======================
-   Currency helpers (non-admin)
+   Work session
    ====================== */
 
-async function adjustCurrency(userId, deltas = {}) {
+async function startWork(userId) {
   try {
-    const res = await ensurePlayer(userId);
-    if (!res.success) return res;
-    const player = res.data.player;
-    const allowed = ['bronze', 'silver', 'gold', 'gems'];
-    for (const k of Object.keys(deltas)) {
-      if (!allowed.includes(k)) continue;
-      player[k] = Math.max(0, (player[k] || 0) + deltas[k]);
-    }
-    await player.save();
-    return ok({ balance: { bronze: player.bronze, silver: player.silver, gold: player.gold, gems: player.gems } });
-  } catch (err) {
-    console.error('Failed to adjust currency:', err);
-    return fail(err.message);
-  }
-}
+    if (!userId) return fail('Invalid user', 'InvalidUser');
 
-async function addPrestige(userId) {
-  try {
-    const res = await ensurePlayer(userId);
-    if (!res.success) return res;
-    const player = res.data.player;
-    player.prestige += 1;
-    await player.save();
-    return ok({ prestige: player.prestige });
-  } catch (err) {
-    console.error('Failed to add prestige:', err);
-    return fail(err.message);
-  }
-}
+    const now = new Date();
 
-/* ======================
-   ServerAdmin helpers
-   ====================== */
+    const res = await sequelize.transaction(async (t) => {
+      let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!player) {
+        player = await Player.create({ userId }, { transaction: t });
+      }
 
-async function addServerAdmin(serverId, userId, role = 'admin') {
-  if (!serverId || !userId) return fail('serverId and userId required', 'InvalidInput');
-  try {
-    const [rec, created] = await ServerAdmin.findOrCreate({
-      where: { serverId, userId },
-      defaults: { serverId, userId, role }
+      // check active session
+      const active = await WorkSession.findOne({ where: { userId, status: 'working' }, transaction: t, lock: t.LOCK.UPDATE });
+      if (active) return fail('Already working', 'AlreadyWorking', { session: active });
+
+      // check cooldown after collect
+      if (player.lastWorkCollectedAt) {
+        const secondsSinceCollect = Math.floor((now.getTime() - new Date(player.lastWorkCollectedAt).getTime()) / 1000);
+        if (secondsSinceCollect < WORK_COOLDOWN_AFTER_COLLECT_SECONDS) {
+          const remaining = WORK_COOLDOWN_AFTER_COLLECT_SECONDS - secondsSinceCollect;
+          return fail('Cooldown after collect', 'CooldownAfterCollect', { remaining });
+        }
+      }
+
+      const finishAt = new Date(now.getTime() + WORK_DURATION_SECONDS * 1000);
+      const session = await WorkSession.create({ userId, startedAt: now, finishAt, status: 'working' }, { transaction: t });
+
+      return ok({ session });
     });
-    if (!created && rec.role !== role) {
-      rec.role = role;
-      await rec.save();
-    }
-    return ok({ rec: { userId: rec.userId, role: rec.role, createdAt: rec.createdAt } });
+
+    return res;
   } catch (err) {
-    console.error('Failed to add server admin:', err);
-    return fail(err.message);
+    console.error('startWork failed:', err);
+    return fail('Failed to start work', 'Error');
   }
 }
 
-async function removeServerAdmin(serverId, userId) {
-  if (!serverId || !userId) return fail('serverId and userId required', 'InvalidInput');
+async function collectWork(userId) {
   try {
-    const deleted = await ServerAdmin.destroy({ where: { serverId, userId } });
-    return ok({ removed: deleted > 0 });
-  } catch (err) {
-    console.error('Failed to remove server admin:', err);
-    return fail(err.message);
-  }
-}
+    if (!userId) return fail('Invalid user', 'InvalidUser');
 
-async function listServerAdmins(serverId) {
-  if (!serverId) return fail('serverId required', 'InvalidInput');
-  try {
-    const rows = await ServerAdmin.findAll({ where: { serverId }, order: [['createdAt', 'ASC']] });
-    const admins = rows.map(r => ({ userId: r.userId, role: r.role, createdAt: r.createdAt }));
-    return ok({ admins, rows: admins });
-  } catch (err) {
-    console.error('Failed to list server admins:', err);
-    return fail(err.message);
-  }
-}
+    const now = new Date();
 
-async function isServerAdmin(serverId, userId) {
-  if (!serverId || !userId) return ok({ isAdmin: false });
-  try {
-    const rec = await ServerAdmin.findOne({ where: { serverId, userId } });
-    return ok({ isAdmin: !!rec });
+    const res = await sequelize.transaction(async (t) => {
+      const session = await WorkSession.findOne({ where: { userId, status: 'working' }, transaction: t, lock: t.LOCK.UPDATE });
+      if (!session) {
+        // maybe already finished and waiting collect
+        const finished = await WorkSession.findOne({ where: { userId, status: 'finished' }, transaction: t, lock: t.LOCK.UPDATE });
+        if (!finished) return fail('No finished work session to collect', 'NoFinishedSession');
+        // treat finished as collectible
+        session = finished;
+      }
+
+      const secondsUntilFinish = Math.floor((new Date(session.finishAt).getTime() - now.getTime()) / 1000);
+      if (secondsUntilFinish > 0) {
+        return fail('Work still in progress', 'StillWorking', { remaining: secondsUntilFinish });
+      }
+
+      // compute reward and streak
+      let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!player) player = await Player.create({ userId }, { transaction: t });
+
+      // update streak
+      const lastCollected = player.lastWorkCollectedAt ? new Date(player.lastWorkCollectedAt) : null;
+      let streak = 1;
+      if (lastCollected) {
+        const secondsSince = Math.floor((now.getTime() - lastCollected.getTime()) / 1000);
+        if (secondsSince <= WORK_STREAK_WINDOW_SECONDS) {
+          streak = Math.min((player.workStreak || 0) + 1, WORK_STREAK_BONUS_CAP_DAYS);
+        }
+      }
+      player.workStreak = streak;
+      player.lastWorkCollectedAt = now;
+
+      // reward calculation
+      const base = WORK_REWARD_SILVER;
+      const bonus = Math.min(WORK_STREAK_BONUS_PER_DAY * (streak - 1), WORK_REWARD_SILVER);
+      const reward = base + bonus;
+      player.silver = (player.silver || 0) + reward;
+
+      // mark session collected
+      session.status = 'collected';
+      session.collectedAt = now;
+      await session.save({ transaction: t });
+      await player.save({ transaction: t });
+
+      return ok({ reward, streak });
+    });
+
+    return res;
   } catch (err) {
-    console.error('Failed to check server admin:', err);
-    return fail(err.message, null, { isAdmin: false });
+    console.error('collectWork failed:', err);
+    return fail('Failed to collect work', 'Error');
   }
 }
 
 /* ======================
-   Inventory operations (stacking)
+   Inventory & equipment
    ====================== */
 
 async function giveWeapon(userId, weaponId, qty = 1) {
   try {
     if (!userId || !weaponId) return fail('userId and weaponId required', 'InvalidInput');
     const weapon = getWeaponById(weaponId);
-    if (!weapon) return fail('Weapon not found in catalog', 'NotFound');
+    if (!weapon) return fail('Weapon not found', 'NotFound');
 
     const ensureRes = await ensurePlayer(userId);
     if (!ensureRes.success) return ensureRes;
 
-    let inv;
+    let inv = null;
     await sequelize.transaction(async (t) => {
       const existing = await Inventory.findOne({
         where: { userId, itemType: 'weapon', catalogId: weapon.id },
-        transaction: t
+        transaction: t,
+        lock: t.LOCK.UPDATE
       });
       if (existing) {
-        existing.count += qty;
+        existing.count += Number(qty || 1);
         await existing.save({ transaction: t });
         inv = existing;
-        return;
+      } else {
+        inv = await Inventory.create({
+          userId,
+          itemType: 'weapon',
+          catalogId: weapon.id,
+          tier: weapon.tier,
+          rarity: weapon.rarity,
+          itemName: weapon.name,
+          attack: weapon.attack,
+          defense: 0,
+          count: Number(qty || 1)
+        }, { transaction: t });
       }
-      inv = await Inventory.create({
-        userId,
-        itemType: 'weapon',
-        catalogId: weapon.id,
-        tier: weapon.tier,
-        rarity: weapon.rarity,
-        itemName: weapon.name,
-        attack: weapon.attack,
-        defense: 0,
-        count: qty
-      }, { transaction: t });
     });
 
     return ok({ inventory: inv });
   } catch (err) {
     console.error('giveWeapon failed:', err);
-    return fail(err.message || 'Database error');
+    return fail('Failed to grant weapon', 'Error');
   }
 }
 
@@ -588,62 +481,83 @@ async function giveGear(userId, gearId, qty = 1) {
   try {
     if (!userId || !gearId) return fail('userId and gearId required', 'InvalidInput');
     const item = getGearById(gearId);
-    if (!item) return fail('Gear not found in catalog', 'NotFound');
+    if (!item) return fail('Gear not found', 'NotFound');
 
     const ensureRes = await ensurePlayer(userId);
     if (!ensureRes.success) return ensureRes;
 
-    let inv;
+    let inv = null;
     await sequelize.transaction(async (t) => {
       const existing = await Inventory.findOne({
         where: { userId, itemType: 'gear', catalogId: item.id },
-        transaction: t
+        transaction: t,
+        lock: t.LOCK.UPDATE
       });
       if (existing) {
-        existing.count += qty;
+        existing.count += Number(qty || 1);
         await existing.save({ transaction: t });
         inv = existing;
-        return;
+      } else {
+        inv = await Inventory.create({
+          userId,
+          itemType: 'gear',
+          catalogId: item.id,
+          tier: item.tier,
+          rarity: item.rarity,
+          itemName: item.name,
+          attack: 0,
+          defense: item.defense,
+          count: Number(qty || 1)
+        }, { transaction: t });
       }
-      inv = await Inventory.create({
-        userId,
-        itemType: 'gear',
-        catalogId: item.id,
-        tier: item.tier,
-        rarity: item.rarity,
-        itemName: item.name,
-        attack: 0,
-        defense: item.defense,
-        count: qty
-      }, { transaction: t });
     });
 
     return ok({ inventory: inv });
   } catch (err) {
     console.error('giveGear failed:', err);
-    return fail(err.message || 'Database error');
+    return fail('Failed to grant gear', 'Error');
   }
 }
 
 async function getWeapons(userId) {
   try {
     if (!userId) return fail('userId required', 'InvalidInput');
-    const rows = await Inventory.findAll({ where: { userId, itemType: 'weapon' } });
+    const rows = await Inventory.findAll({
+      where: { userId, itemType: 'weapon' },
+      order: [['createdAt', 'ASC']]
+    });
     return ok({ items: rows });
   } catch (err) {
     console.error('getWeapons failed:', err);
-    return fail(err.message);
+    return fail('Failed to fetch weapons', 'Error');
   }
 }
 
 async function getGear(userId) {
   try {
     if (!userId) return fail('userId required', 'InvalidInput');
-    const rows = await Inventory.findAll({ where: { userId, itemType: 'gear' } });
+    const rows = await Inventory.findAll({
+      where: { userId, itemType: 'gear' },
+      order: [['createdAt', 'ASC']]
+    });
     return ok({ items: rows });
   } catch (err) {
     console.error('getGear failed:', err);
-    return fail(err.message);
+    return fail('Failed to fetch gear', 'Error');
+  }
+}
+
+async function inventory(userId) {
+  try {
+    if (!userId) return fail('userId required', 'InvalidInput');
+    const rows = await Inventory.findAll({
+      where: { userId },
+      order: [['createdAt', 'ASC']]
+    });
+    return ok({ items: rows });
+  } catch (err) {
+    console.error('inventory failed:', err);
+    return fail('Failed to fetch inventory', 'Error');
   }
 }
 
@@ -670,13 +584,9 @@ async function removeInventoryCount(inventoryId, qty = 1) {
     return ok({ inventory: resultInv });
   } catch (err) {
     console.error('removeInventoryCount failed:', err);
-    return fail(err.message || 'Database error');
+    return fail(err.message || 'Failed to remove inventory count', 'Error');
   }
 }
-
-/* ======================
-   Equip helpers
-   ====================== */
 
 async function equipWeaponByInventoryId(userId, inventoryId) {
   try {
@@ -694,7 +604,7 @@ async function equipWeaponByInventoryId(userId, inventoryId) {
     return ok({ inventory: inv });
   } catch (err) {
     console.error('equipWeaponByInventoryId failed:', err);
-    return fail(err.message || 'Database error');
+    return fail('Failed to equip weapon', 'Error');
   }
 }
 
@@ -714,7 +624,7 @@ async function equipGearByInventoryId(userId, inventoryId) {
     return ok({ inventory: inv });
   } catch (err) {
     console.error('equipGearByInventoryId failed:', err);
-    return fail(err.message || 'Database error');
+    return fail('Failed to equip gear', 'Error');
   }
 }
 
@@ -723,6 +633,7 @@ async function getEquipped(userId) {
     if (!userId) return fail('userId required', 'InvalidInput');
     const player = await Player.findByPk(userId);
     if (!player) return fail('Player not found', 'NotFound');
+
     const weapon = player.equippedWeaponInvId ? await Inventory.findByPk(player.equippedWeaponInvId) : null;
     const gearItem = player.equippedGearInvId ? await Inventory.findByPk(player.equippedGearInvId) : null;
 
@@ -731,338 +642,201 @@ async function getEquipped(userId) {
     return ok({ weapon, gear: gearItem, power });
   } catch (err) {
     console.error('getEquipped failed:', err);
-    return fail(err.message);
+    return fail('Failed to fetch equipped items', 'Error');
   }
 }
 
 /* ======================
-   Work session helpers
+   Hunt
    ====================== */
 
-async function startWork(userId) {
+async function hunt(userId, monsterId) {
   try {
     if (!userId) return fail('Invalid user', 'InvalidUser');
 
-    const now = new Date();
+    // Ensure player and equipped items
+    const equipRes = await getEquipped(userId);
+    if (!equipRes.success) return equipRes;
+    const power = equipRes.data.power || 0;
+    if (!monsterId) return fail('monsterId required', 'InvalidInput');
 
-    const result = await sequelize.transaction(async (t) => {
-      const player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
-      if (!player) throw new Error('Player not found');
+    const monster = getMonsterById(monsterId);
+    if (!monster) return fail('Monster not found', 'NotFound');
 
-      const active = await WorkSession.findOne({
-        where: { userId, status: 'working' },
-        transaction: t,
-        lock: t.LOCK.UPDATE
-      });
-      if (active) {
-        return fail('Already working', 'AlreadyWorking', { session: active });
-      }
-
-      if (player.lastWorkCollectedAt) {
-        const secondsSinceCollect = Math.floor((now.getTime() - new Date(player.lastWorkCollectedAt).getTime()) / 1000);
-        if (secondsSinceCollect < WORK_COOLDOWN_AFTER_COLLECT_SECONDS) {
-          const remaining = WORK_COOLDOWN_AFTER_COLLECT_SECONDS - secondsSinceCollect;
-          return fail('Cooldown after collect', 'CooldownAfterCollect', { remaining });
-        }
-      }
-
-      const finishAt = new Date(now.getTime() + WORK_DURATION_SECONDS * 1000);
-      const session = await WorkSession.create({
-        userId,
-        startedAt: now,
-        finishAt,
-        status: 'working'
-      }, { transaction: t });
-
-      return ok({ session });
-    });
-
-    return result;
-  } catch (err) {
-    console.error('startWork failed:', err);
-    return fail(err.message || String(err), 'Error');
-  }
-}
-
-/**
- * Collect finished work reward
- */
-async function collectWork(userId) {
-  try {
-    if (!userId) return fail('Invalid user', 'InvalidUser');
-
-    const now = new Date();
-
-    const result = await sequelize.transaction(async (t) => {
-      const session = await WorkSession.findOne({
-        where: { userId, status: { [Op.in]: ['working', 'finished'] } },
-        order: [['createdAt', 'DESC']],
-        transaction: t,
-        lock: t.LOCK.UPDATE
-      });
-
-      if (!session) {
-        return fail('No active work session', 'NoSession');
-      }
-
-      // If still working, check time left
-      if (session.status === 'working') {
-        const finishAt = new Date(session.finishAt);
-        const secondsLeft = Math.max(0, Math.ceil((finishAt.getTime() - now.getTime()) / 1000));
-        if (secondsLeft > 0) {
-          return fail('Work collect is on cooldown', 'CooldownAfterWork', { remaining: secondsLeft });
-        }
-        session.status = 'finished';
-        await session.save({ transaction: t });
-      }
-
-      // Load player
-      let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
-      if (!player) {
-        player = await Player.create({ userId }, { transaction: t });
-      }
-
-      // Compute streak
-      let newStreak = 1;
-      if (player.lastWorkCollectedAt) {
-        const secondsSince = Math.floor((now.getTime() - new Date(player.lastWorkCollectedAt).getTime()) / 1000);
-        if (secondsSince <= WORK_STREAK_WINDOW_SECONDS) {
-          newStreak = (player.workStreak || 0) + 1;
-          if (newStreak > WORK_STREAK_BONUS_CAP_DAYS) newStreak = WORK_STREAK_BONUS_CAP_DAYS;
-        }
-      }
-
-      const baseReward = WORK_REWARD_SILVER;
-      const bonus = (newStreak - 1) * WORK_STREAK_BONUS_PER_DAY;
-      const totalReward = baseReward + bonus;
-
-      // Update player
-      player.silver = (player.silver || 0) + totalReward;
-      player.workStreak = newStreak;
-      player.lastWorkCollectedAt = now;
-      await player.save({ transaction: t });
-
-      // Update session
-      session.status = 'collected';
-      session.collectedAt = now;
-      await session.save({ transaction: t });
-
-      return ok({
-        totalReward,
-        baseReward,
-        bonus,
-        newSilver: player.silver,
-        streak: newStreak
-      });
-    });
-
-    return result;
-  } catch (err) {
-    console.error('collectWork failed:', err);
-    return fail(err.message || 'collectWork error', 'Error');
-  }
-}
-
-
-/* ======================
-   Daily claim helpers
-   ====================== */
-
-async function claimDaily(userId) {
-  try {
-    if (!userId) return fail('Invalid user', 'InvalidUser');
-    const now = new Date();
-
-    const res = await sequelize.transaction(async (t) => {
-      let claim = await DailyClaim.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
-      if (!claim) {
-        claim = await DailyClaim.create({ userId, lastClaimAt: null, streak: 0 }, { transaction: t });
-      }
-
-      if (claim.lastClaimAt) {
-        const secondsSince = Math.floor((now.getTime() - new Date(claim.lastClaimAt).getTime()) / 1000);
-        if (secondsSince < DAILY_COOLDOWN_SECONDS) {
-          const remaining = DAILY_COOLDOWN_SECONDS - secondsSince;
-          return fail('Already claimed', 'AlreadyClaimed', { remaining });
-        }
-      }
-
-      // Determine streak
-      let newStreak = 1;
-      if (claim.lastClaimAt) {
-        const secondsSince = Math.floor((now.getTime() - new Date(claim.lastClaimAt).getTime()) / 1000);
-        if (secondsSince <= DAILY_STREAK_WINDOW_SECONDS) {
-          newStreak = (claim.streak || 0) + 1;
-        }
-      }
-
-      const bonus = (newStreak - 1) * DAILY_STREAK_BONUS;
-      const bronzeReward = Math.max(0, DAILY_BASE_BRONZE + bonus);
-
-      // Update claim record
-      claim.lastClaimAt = now;
-      claim.streak = newStreak;
-      await claim.save({ transaction: t });
-
-      // Update player currency
-      let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
-      if (!player) {
-        player = await Player.create({ userId }, { transaction: t });
-      }
-      player.bronze = (player.bronze || 0) + bronzeReward;
-      await player.save({ transaction: t });
-
-      return ok({ reward: { bronze: bronzeReward }, streak: newStreak });
-    });
-
-    return res;
-  } catch (err) {
-    console.error('claimDaily failed:', err);
-    return fail(err.message || 'claimDaily error');
-  }
-}
-
-/* ======================
-   Hunt helpers
-   ====================== */
-
-async function hunt(userId, monsterTier = null) {
-  try {
-    if (!userId) return fail('Invalid user', 'InvalidUser');
-
-    // Determine player's power from equipped items
-    const equipped = await getEquipped(userId);
-    if (!equipped.success) return equipped;
-    const power = equipped.data.power || 0;
-
-    // Choose tier if not provided
-    let chosenTier = Number(monsterTier) || 0;
-    if (!chosenTier || chosenTier <= 0) {
-      const best = getBestTier(power);
-      if (!best.success) return best;
-      chosenTier = best.data.tier || 0;
+    if (power < (monster.threshold || 0)) {
+      return fail('Power too low', 'ThresholdNotMet', { power, monster, threshold: monster.threshold });
     }
 
-    if (chosenTier <= 0) return fail('No eligible monsters for your power', 'NoMonsters');
-
-    // pick a random monster from that tier that the player can fight
-    const eligible = getEligibleMonsters(power);
-    if (!eligible.success) return eligible;
-    const arr = eligible.data.eligible[chosenTier] || [];
-    if (!arr || arr.length === 0) return fail('No eligible monsters in chosen tier', 'NoMonsters');
-
-    const monster = arr[Math.floor(Math.random() * arr.length)];
-
+    // Optional: enforce hunt cooldown per tier
+    const tier = monster.tier || 0;
     const now = new Date();
 
-    // Check cooldown
-    const cooldownRec = await HuntCooldown.findOne({ where: { userId, monsterTier: chosenTier } });
-    if (cooldownRec && cooldownRec.lastHuntAt) {
+    // check cooldown
+    const cooldownRec = await HuntCooldown.findOne({ where: { userId, monsterTier: tier } });
+    if (cooldownRec) {
       const secondsSince = Math.floor((now.getTime() - new Date(cooldownRec.lastHuntAt).getTime()) / 1000);
       if (secondsSince < DEFAULT_HUNT_COOLDOWN_SECONDS) {
-        const remaining = DEFAULT_HUNT_COOLDOWN_SECONDS - secondsSince;
-        return fail('Hunt cooldown', 'Cooldown', { remaining });
+        return fail('Hunt cooldown', 'Cooldown', { remaining: DEFAULT_HUNT_COOLDOWN_SECONDS - secondsSince });
       }
     }
 
-    // Simulate fight: simple success chance based on power vs threshold
-    const threshold = Number(monster.threshold) || 0;
-    const chance = Math.min(0.95, Math.max(0.05, (power / (threshold || 1)))); // normalized chance
-    const roll = Math.random();
-    const success = roll <= chance;
+    // award gems and record kill
+    const gemsAwarded = monster.gems || 0;
 
-    // Update cooldown and records
     await sequelize.transaction(async (t) => {
-      await HuntCooldown.upsert({ userId, monsterTier: chosenTier, lastHuntAt: now }, { transaction: t });
+      // update player gems
+      let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!player) player = await Player.create({ userId }, { transaction: t });
+      player.gems = (player.gems || 0) + gemsAwarded;
+      await player.save({ transaction: t });
 
-      const [rec, created] = await HuntRecord.findOrCreate({
-        where: { userId, monsterTier: chosenTier },
-        defaults: { userId, monsterTier: chosenTier, kills: 0 },
+      // update hunt record
+      const [rec] = await HuntRecord.findOrCreate({
+        where: { userId, monsterTier: tier },
+        defaults: { userId, monsterTier: tier, kills: 0 },
         transaction: t
       });
+      rec.kills = (rec.kills || 0) + 1;
+      await rec.save({ transaction: t });
 
-      if (success) {
-        rec.kills = (rec.kills || 0) + 1;
-        await rec.save({ transaction: t });
-
-        // Reward: gems (monster.gems) and some bronze/silver
-        const gemsReward = Number(monster.gems) || 0;
-        const bronzeReward = Math.max(1, Math.floor((threshold || 10) / 10));
-        const silverReward = Math.max(0, Math.floor((threshold || 10) / 20));
-
-        let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
-        if (!player) {
-          player = await Player.create({ userId }, { transaction: t });
-        }
-        player.gems = (player.gems || 0) + gemsReward;
-        player.bronze = (player.bronze || 0) + bronzeReward;
-        player.silver = (player.silver || 0) + silverReward;
-        await player.save({ transaction: t });
-
-        return; // transaction continues to outer return
-      } else {
-        // On failure, maybe give small consolation
-        const bronzeConsolation = 1;
-        let player = await Player.findByPk(userId, { transaction: t, lock: t.LOCK.UPDATE });
-        if (!player) {
-          player = await Player.create({ userId }, { transaction: t });
-        }
-        player.bronze = (player.bronze || 0) + bronzeConsolation;
-        await player.save({ transaction: t });
-        return;
-      }
+      // update cooldown
+      await HuntCooldown.upsert({ userId, monsterTier: tier, lastHuntAt: now }, { transaction: t });
     });
 
-    // Re-fetch player rewards to return a consistent response
-    const playerAfter = await Player.findByPk(userId);
-    return ok({
-      monster: { id: monster.id, name: monster.name, tier: monster.tier, threshold: monster.threshold },
-      success,
-      balance: { bronze: playerAfter.bronze, silver: playerAfter.silver, gems: playerAfter.gems }
-    });
+    return ok({ monster, gemsAwarded });
   } catch (err) {
     console.error('hunt failed:', err);
-    return fail(err.message || 'hunt error');
+    return fail('Hunt failed', 'Error');
   }
 }
 
 /* ======================
-   Auction helpers (simple)
+   Admin helpers
    ====================== */
 
-async function createAuction(sellerId, itemName, startingBid = 0) {
+async function adminAdjustCurrency(adminUserId, targetUserId, deltas = {}) {
   try {
-    if (!sellerId || !itemName) return fail('sellerId and itemName required', 'InvalidInput');
-    const auc = await Auction.create({ sellerId, itemName, startingBid, highestBid: startingBid, highestBidder: null });
-    return ok({ auction: auc });
+    if (!adminUserId) return fail('Invalid admin user', 'InvalidUser');
+    if (!targetUserId) return fail('Invalid target user', 'InvalidInput');
+
+    const allowed = ['bronze', 'silver', 'gold', 'gems'];
+    const keys = Object.keys(deltas || {});
+    if (keys.length === 0) return fail('No currency deltas provided', 'InvalidInput');
+
+    for (const k of keys) {
+      if (!allowed.includes(k)) return fail(`Invalid currency type: ${k}`, 'InvalidCurrencyType');
+      if (typeof deltas[k] !== 'number' || !Number.isFinite(deltas[k])) return fail(`Invalid delta for ${k}`, 'InvalidInput');
+    }
+
+    const res = await sequelize.transaction(async (t) => {
+      let player = await Player.findByPk(targetUserId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!player) player = await Player.create({ userId: targetUserId }, { transaction: t });
+
+      for (const k of keys) {
+        const delta = Number(deltas[k]) || 0;
+        player[k] = Math.max(0, (player[k] || 0) + delta);
+      }
+      await player.save({ transaction: t });
+
+      return { userId: player.userId, balance: { bronze: player.bronze, silver: player.silver, gold: player.gold, gems: player.gems } };
+    });
+
+    return ok(res);
   } catch (err) {
-    console.error('createAuction failed:', err);
-    return fail(err.message || 'createAuction error');
+    console.error('adminAdjustCurrency failed:', err);
+    return fail('Failed to adjust currency', 'Error');
   }
 }
 
-async function listAuctions() {
+async function adminGrantItem(adminUserId, targetUserId, itemType, catalogId, qty = 1) {
   try {
-    const rows = await Auction.findAll({ order: [['createdAt', 'DESC']] });
-    return ok({ auctions: rows });
+    if (!adminUserId) return fail('Invalid admin user', 'InvalidUser');
+    if (!targetUserId) return fail('Invalid target user', 'InvalidInput');
+    if (!itemType || !['weapon', 'gear'].includes(itemType)) return fail('Invalid itemType', 'InvalidInput');
+    if (!catalogId) return fail('catalogId required', 'InvalidInput');
+    qty = Number(qty) || 1;
+    if (qty <= 0) return fail('qty must be positive', 'InvalidInput');
+
+    if (itemType === 'weapon') {
+      return await giveWeapon(targetUserId, catalogId, qty);
+    } else {
+      return await giveGear(targetUserId, catalogId, qty);
+    }
   } catch (err) {
-    console.error('listAuctions failed:', err);
-    return fail(err.message);
+    console.error('adminGrantItem failed:', err);
+    return fail('Failed to grant item', 'Error');
   }
 }
 
 /* ======================
-   Utility / Admin convenience
+   Server admin management
    ====================== */
 
-async function syncModels() {
+async function addServerAdmin(serverId, userId, role = 'admin') {
+  if (!serverId || !userId) return fail('serverId and userId required', 'InvalidInput');
+  try {
+    const [rec, created] = await ServerAdmin.findOrCreate({
+      where: { serverId, userId },
+      defaults: { serverId, userId, role }
+    });
+    if (!created && rec.role !== role) {
+      rec.role = role;
+      await rec.save();
+    }
+    return ok({ rec: { userId: rec.userId, role: rec.role, createdAt: rec.createdAt } });
+  } catch (err) {
+    console.error('addServerAdmin failed:', err);
+    return fail('Failed to add server admin', 'Error');
+  }
+}
+
+async function removeServerAdmin(serverId, userId) {
+  if (!serverId || !userId) return fail('serverId and userId required', 'InvalidInput');
+  try {
+    const deleted = await ServerAdmin.destroy({ where: { serverId, userId } });
+    return ok({ removed: deleted > 0 });
+  } catch (err) {
+    console.error('removeServerAdmin failed:', err);
+    return fail('Failed to remove server admin', 'Error');
+  }
+}
+
+async function listServerAdmins(serverId) {
+  if (!serverId) return fail('serverId required', 'InvalidInput');
+  try {
+    const rows = await ServerAdmin.findAll({ where: { serverId }, order: [['createdAt', 'ASC']] });
+    const admins = rows.map(r => ({ userId: r.userId, role: r.role, createdAt: r.createdAt }));
+    return ok({ admins, rows: admins });
+  } catch (err) {
+    console.error('listServerAdmins failed:', err);
+    return fail('Failed to list server admins', 'Error');
+  }
+}
+
+async function isServerAdmin(serverId, userId) {
+  if (!serverId || !userId) return ok({ isAdmin: false });
+  try {
+    const rec = await ServerAdmin.findOne({ where: { serverId, userId } });
+    return ok({ isAdmin: !!rec });
+  } catch (err) {
+    console.error('isServerAdmin failed:', err);
+    return fail('Failed to check server admin', 'Error', { isAdmin: false });
+  }
+}
+
+/* ======================
+   Initialization helper
+   ====================== */
+
+async function initDatabase() {
   try {
     await sequelize.authenticate();
     await sequelize.sync();
-    return ok({ synced: true });
+    // Optionally refresh caches or seed minimal data here
+    return ok({ message: 'Database initialized' });
   } catch (err) {
-    console.error('syncModels failed:', err);
-    return fail(err.message || 'sync error');
+    console.error('initDatabase failed:', err);
+    return fail('Failed to initialize database', 'Error');
   }
 }
 
@@ -1071,78 +845,47 @@ async function syncModels() {
    ====================== */
 
 module.exports = {
-  // sequelize & models
+  // DB handle
   sequelize,
-  Player,
-  Inventory,
-  HuntRecord,
-  HuntCooldown,
-  Auction,
-  DailyClaim,
-  WorkSession,
-  ServerAdmin,
+  initDatabase,
 
   // catalogs
   weapons,
   gear,
   monsters,
 
-  // lookups
-  getWeaponById,
-  getGearById,
-  getMonsterById,
-  getMonstersByTier,
-
-  // index helpers
-  buildTierIndex,
-  refreshMonsterIndex,
-  getBestTier,
-  getEligibleMonsters,
-
-  // base helpers
-  ensurePlayer,
-  ensurePlayerOrThrow,
+  // account
   getBalance,
   addCurrency,
-  adjustCurrency,
-  addPrestige,
 
-  // server admin
-  addServerAdmin,
-  removeServerAdmin,
-  listServerAdmins,
-  isServerAdmin,
-
-  // inventory
-  giveWeapon,
-  giveGear,
-  getWeapons,
-  getGear,
-  removeInventoryCount,
-
-  // equip
-  equipWeaponByInventoryId,
-  equipGearByInventoryId,
-  getEquipped,
+  // daily
+  claimDaily,
 
   // work
   startWork,
   collectWork,
 
-  // daily
-  claimDaily,
+  // inventory / equipment
+  giveWeapon,
+  giveGear,
+  getWeapons,
+  getGear,
+  inventory,
+  removeInventoryCount,
+  equipWeaponByInventoryId,
+  equipGearByInventoryId,
+  getEquipped,
 
-  // hunt
+  // gameplay
   hunt,
-
-  // auctions
-  createAuction,
-  listAuctions,
 
   // admin
   adminAdjustCurrency,
   adminGrantItem,
 
-  // utilities
-  syncModels
+  // server admin management
+  addServerAdmin,
+  removeServerAdmin,
+  listServerAdmins,
+  isServerAdmin
 };
