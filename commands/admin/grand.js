@@ -14,9 +14,9 @@ module.exports = {
       const { storage, config } = context;
 
       // Resolve admin IDs from validated config first, fallback to env
-      const ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length ?
-      config.ADMIN_IDS :
-      (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length
+        ? config.ADMIN_IDS
+        : (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
 
       const callerId = message.author.id;
       function isAdmin(callerIdLocal) {
@@ -26,10 +26,11 @@ module.exports = {
       }
 
       if (!isAdmin(callerId)) {
-        return replyFromResult(message, { success: false, error: 'You are not authorized to use this command.', reason: 'Forbidden' }, {
+        await replyFromResult(message, { success: false, error: 'You are not authorized to use this command.', reason: 'Forbidden' }, {
           label: 'Grant',
-          errorTitle: 'Unauthorized'
+          errorTitle: '🚫 Unauthorized'
         });
+        return;
       }
 
       const targetMention = args[0];
@@ -38,67 +39,73 @@ module.exports = {
       const qty = args[3] ? parseInt(args[3], 10) : 1;
 
       if (!targetMention || !catalogId || !type) {
-        return replyFromResult(message, { success: false, error: 'Usage: `.grant @user <catalogId> <weapon|gear> [qty]`', reason: 'InvalidInput' }, {
+        await replyFromResult(message, { success: false, error: 'Usage: `.grant @user <catalogId> <weapon|gear> [qty]`', reason: 'InvalidInput' }, {
           label: 'Grant',
-          errorTitle: 'Invalid Usage'
+          errorTitle: '⚠️ Invalid Usage'
         });
+        return;
       }
 
       if (!['weapon', 'gear'].includes(type)) {
-        return replyFromResult(message, { success: false, error: 'Item type must be "weapon" or "gear".', reason: 'InvalidInput' }, {
+        await replyFromResult(message, { success: false, error: 'Item type must be "weapon" or "gear".', reason: 'InvalidInput' }, {
           label: 'Grant',
-          errorTitle: 'Invalid Type'
+          errorTitle: '⚠️ Invalid Type'
         });
+        return;
       }
 
       if (Number.isNaN(qty) || qty <= 0) {
-        return replyFromResult(message, { success: false, error: 'Quantity must be a positive integer.', reason: 'InvalidInput' }, {
+        await replyFromResult(message, { success: false, error: 'Quantity must be a positive integer.', reason: 'InvalidInput' }, {
           label: 'Grant',
-          errorTitle: 'Invalid Quantity'
+          errorTitle: '⚠️ Invalid Quantity'
         });
+        return;
       }
 
       const match = targetMention.match(/^<@!?(\d+)>$/);
       if (!match) {
-        return replyFromResult(message, { success: false, error: 'Please mention the target user (e.g. @User).', reason: 'InvalidInput' }, {
+        await replyFromResult(message, { success: false, error: 'Please mention the target user (e.g. @User).', reason: 'InvalidInput' }, {
           label: 'Grant',
-          errorTitle: 'Invalid Target'
+          errorTitle: '⚠️ Invalid Target'
         });
+        return;
       }
       const targetId = match[1];
 
       if (!storage || typeof storage.adminGrantItem !== 'function') {
         console.error('storage.adminGrantItem is not available in command context');
-        return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
+        await replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
           label: 'Grant',
-          errorTitle: 'Error'
+          errorTitle: '❌ Error'
         });
+        return;
       }
 
       const res = await storage.adminGrantItem(targetId, catalogId, type, qty);
 
       await replyFromResult(message, res, {
         label: 'Grant',
-        successTitle: 'Granted',
+        successTitle: '🎁 Item Granted',
         successDescription: (d) => {
-          // storage may return inventory, rec, or data.inventory
           const inv = d.inventory || d.rec || d.data?.inventory || null;
           if (inv) {
             const name = inv.itemName || inv.item_name || catalogId;
             const id = inv.id ?? inv.inventoryId ?? 'N/A';
             const count = inv.count ?? qty;
-            return `✅ Granted ${count}x **${name}** (${type}) to <@${targetId}>. Inventory ID: ${id}.`;
+            return (
+              `✅ Granted **${count}x ${name}** (${type}) to <@${targetId}>.\n\n` +
+              `📦 Inventory ID: **${id}**`
+            );
           }
-          // fallback generic message
-          return `✅ Granted ${qty}x **${catalogId}** (${type}) to <@${targetId}>.`;
+          return `✅ Granted **${qty}x ${catalogId}** (${type}) to <@${targetId}>.`;
         },
-        errorTitle: 'Failed'
+        errorTitle: '❌ Failed'
       });
     } catch (err) {
       console.error('Grant command error:', err);
-      return replyFromResult(message, { success: false, error: err?.message || 'unexpected error', reason: 'Error' }, {
+      await replyFromResult(message, { success: false, error: err?.message || 'Unexpected error', reason: 'Error' }, {
         label: 'Grant',
-        errorTitle: 'Error'
+        errorTitle: '❌ Error'
       });
     }
   }

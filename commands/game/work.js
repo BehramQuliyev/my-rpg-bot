@@ -8,23 +8,28 @@ module.exports = {
   async execute(message, args = [], context = {}) {
     const { storage } = context;
     if (!storage || typeof storage.startWork !== 'function') {
-      return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
+      await replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
         label: 'Work start',
-        errorTitle: 'Error'
+        errorTitle: '❌ Error'
       });
+      return;
     }
 
     const res = await storage.startWork(message.author.id);
 
     await replyFromResult(message, res, {
       label: 'Work start',
-      successTitle: 'Work started',
+      successTitle: '💼 Work Started!',
       successDescription: (d) => {
         const finishUnix = Math.floor(new Date(d.session.finishAt).getTime() / 1000);
-        return `Session started. Finish at: <t:${finishUnix}:R>.`;
+        return (
+          `🕒 Your work session has begun!\n\n` +
+          `⏳ It will finish: <t:${finishUnix}:R>\n` +
+          `🏆 Stay consistent to build your streak!`
+        );
       },
-      infoTitle: 'Info',
-      errorTitle: 'Error'
+      infoTitle: 'ℹ️ Info',
+      errorTitle: '❌ Error'
     });
   }
 };

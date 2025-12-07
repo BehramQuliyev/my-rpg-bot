@@ -15,16 +15,17 @@ module.exports = {
 
       // Ensure guild context
       if (!message.guild) {
-        return replyFromResult(message, { success: false, error: 'This command must be used in a server (guild).', reason: 'InvalidContext' }, {
+        await replyFromResult(message, { success: false, error: 'This command must be used in a server (guild).', reason: 'InvalidContext' }, {
           label: 'List Admins',
           errorTitle: 'Invalid Context'
         });
+        return;
       }
 
       // Resolve global admin IDs from validated config first, fallback to env
-      const GLOBAL_ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length ?
-      config.ADMIN_IDS :
-      (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const GLOBAL_ADMIN_IDS = Array.isArray(config && config.ADMIN_IDS) && config.ADMIN_IDS.length
+        ? config.ADMIN_IDS
+        : (process.env.ADMIN_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
 
       const serverId = message.guild.id;
       const callerId = message.author.id;
@@ -39,10 +40,11 @@ module.exports = {
       // Check storage availability for server admin helpers
       if (!storage || typeof storage.isServerAdmin !== 'function' || typeof storage.listServerAdmins !== 'function') {
         console.error('storage server-admin helpers are not available in command context');
-        return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
+        await replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, {
           label: 'List Admins',
           errorTitle: 'Error'
         });
+        return;
       }
 
       // Determine caller privileges (storage.isServerAdmin may return a result shape or a plain object)
@@ -51,26 +53,30 @@ module.exports = {
 
       const callerIsServerAdminRes = await storage.isServerAdmin(serverId, callerId);
       const callerIsServerAdmin = !!(
-      callerIsServerAdminRes && callerIsServerAdminRes.isAdmin ||
-      callerIsServerAdminRes && callerIsServerAdminRes.success && (callerIsServerAdminRes.data?.isAdmin || callerIsServerAdminRes.data?.is_admin));
-
+        (callerIsServerAdminRes && callerIsServerAdminRes.isAdmin) ||
+        (callerIsServerAdminRes && callerIsServerAdminRes.success && (callerIsServerAdminRes.data?.isAdmin || callerIsServerAdminRes.data?.is_admin))
+      );
 
       const canManage = callerIsOwner || callerIsGlobalAdmin || callerIsServerAdmin;
-
       const action = (args[0] || 'list').toLowerCase();
 
       // LIST: anyone in the server can view the list (change to restrict if desired)
       if (action === 'list') {
         const rowsRaw = await storage.listServerAdmins(serverId);
         // support both legacy array and result shape
-        const rows = Array.isArray(rowsRaw) ? rowsRaw : rowsRaw && rowsRaw.success ? rowsRaw.data?.rows || rowsRaw.data || [] : rowsRaw || [];
+        const rows = Array.isArray(rowsRaw)
+          ? rowsRaw
+          : (rowsRaw && rowsRaw.success)
+            ? rowsRaw.data?.rows || rowsRaw.data || []
+            : rowsRaw || [];
 
         if (!rows || rows.length === 0) {
-          return replyFromResult(message, { success: true, data: { rows: [] } }, {
+          await replyFromResult(message, { success: true, data: { rows: [] } }, {
             label: 'List Admins',
             successTitle: 'Server Admins',
             successDescription: () => 'No server admins configured for this server.'
           });
+          return;
         }
 
         // Build pages of up to 25 entries per embed
@@ -106,25 +112,33 @@ module.exports = {
 
       // For add/remove actions, require manage permission
       if (!canManage) {
-        return replyFromResult(message, { success: false, error: 'You are not authorized to manage server admins. Only the server owner, global admins, or existing server admins can do this.', reason: 'Forbidden' }, {
+        await replyFromResult(message, { success: false, error: 'You are not authorized to manage server admins. Only the server owner, global admins, or existing server admins can do this.', reason: 'Forbidden' }, {
           label: 'List Admins',
           errorTitle: 'Unauthorized'
         });
+        return;
       }
 
       // ADD
       if (action === 'add') {
         const mention = args[1];
         const role = args[2] || 'admin';
-        if (!mention) return replyFromResult(message, { success: false, error: 'Usage: `.listadmins add @user [role]`', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Usage' });
+        if (!mention) {
+          await replyFromResult(message, { success: false, error: 'Usage: `.listadmins add @user [role]`', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Usage' });
+          return;
+        }
 
         const m = mention.match(/^<@!?(\d+)>$/);
-        if (!m) return replyFromResult(message, { success: false, error: 'Please mention the user to add (e.g., @User).', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Target' });
+        if (!m) {
+          await replyFromResult(message, { success: false, error: 'Please mention the user to add (e.g., @User).', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Target' });
+          return;
+        }
         const targetId = m[1];
 
         if (typeof storage.addServerAdmin !== 'function') {
           console.error('storage.addServerAdmin not available');
-          return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
+          await replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
+          return;
         }
 
         try {
@@ -140,48 +154,60 @@ module.exports = {
           });
         } catch (err) {
           console.error('addServerAdmin error', err);
-          return replyFromResult(message, { success: false, error: err?.message || 'Failed to add admin', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
+          await replyFromResult(message, { success: false, error: err?.message || 'Failed to add admin', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
         }
+        return;
       }
 
       // REMOVE
       if (action === 'remove') {
         const mention = args[1];
-        if (!mention) return replyFromResult(message, { success: false, error: 'Usage: `.listadmins remove @user`', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Usage' });
+        if (!mention) {
+          await replyFromResult(message, { success: false, error: 'Usage: `.listadmins remove @user`', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Usage' });
+          return;
+        }
 
         const m = mention.match(/^<@!?(\d+)>$/);
-        if (!m) return replyFromResult(message, { success: false, error: 'Please mention the user to remove (e.g., @User).', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Target' });
+        if (!m) {
+          await replyFromResult(message, { success: false, error: 'Please mention the user to remove (e.g., @User).', reason: 'InvalidInput' }, { label: 'List Admins', errorTitle: 'Invalid Target' });
+          return;
+        }
         const targetId = m[1];
 
         if (typeof storage.removeServerAdmin !== 'function') {
           console.error('storage.removeServerAdmin not available');
-          return replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
+          await replyFromResult(message, { success: false, error: 'Bot storage is not available. Try again later.', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
+          return;
         }
 
         try {
           const ok = await storage.removeServerAdmin(serverId, targetId);
           // support both result shape and boolean-like responses
           if (ok && ok.success === false) {
-            return replyFromResult(message, ok, { label: 'List Admins', errorTitle: 'Failed' });
+            await replyFromResult(message, ok, { label: 'List Admins', errorTitle: 'Failed' });
+            return;
           }
           if (ok && (ok.success === true || ok.removed || ok.deleted)) {
-            return replyFromResult(message, { success: true, data: {} }, { label: 'List Admins', successTitle: 'Removed', successDescription: () => `✅ Removed <@${targetId}> from server admins.` });
+            await replyFromResult(message, { success: true, data: {} }, { label: 'List Admins', successTitle: 'Removed', successDescription: () => `✅ Removed <@${targetId}> from server admins.` });
+            return;
           }
           // fallback: if storage returned falsy or indicates not found
-          return replyFromResult(message, { success: false, error: `<@${targetId}> was not a server admin.`, reason: 'NotFound' }, { label: 'List Admins', errorTitle: 'Not Found' });
+          await replyFromResult(message, { success: false, error: `<@${targetId}> was not a server admin.`, reason: 'NotFound' }, { label: 'List Admins', errorTitle: 'Not Found' });
         } catch (err) {
           console.error('removeServerAdmin error', err);
-          return replyFromResult(message, { success: false, error: err?.message || 'Failed to remove admin', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
+          await replyFromResult(message, { success: false, error: err?.message || 'Failed to remove admin', reason: 'Error' }, { label: 'List Admins', errorTitle: 'Error' });
         }
+        return;
       }
 
-      return replyFromResult(message, { success: false, error: 'Unknown action. Use `list`, `add`, or `remove`.', reason: 'InvalidInput' }, {
+      await replyFromResult(message, { success: false, error: 'Unknown action. Use `list`, `add`, or `remove`.', reason: 'InvalidInput' }, {
         label: 'List Admins',
         errorTitle: 'Invalid Action'
       });
+      return;
     } catch (err) {
       console.error('listadmins command error:', err);
-      return replyFromResult(message, { success: false, error: 'An unexpected error occurred while managing server admins. Please try again later.', reason: 'Error' }, {
+      await replyFromResult(message, { success: false, error: 'An unexpected error occurred while managing server admins. Please try again later.', reason: 'Error' }, {
         label: 'List Admins',
         errorTitle: 'Error'
       });
