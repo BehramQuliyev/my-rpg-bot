@@ -929,8 +929,8 @@ async function initDatabase() {
 }
 
 /* ======================
-   Exports
-   ====================== */
+Exports
+====================== */
 
 module.exports = {
   // DB handle
@@ -945,6 +945,8 @@ module.exports = {
   // player helpers
   ensurePlayer,
   ensurePlayerOrThrow,
+
+  // account
   getBalance,
   addCurrency,
 
